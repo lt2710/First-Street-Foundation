@@ -8,6 +8,7 @@ I appreciate your time to visit and take a look at my portfolios. All sorts of f
   #1. Estimate 3 million properties in South Florida with machine learning algorithms (First Street Foundation, R)
 
 This project builds from scratch machine learning algorithms that estimates property value in a large-scale dataset of 3 million properties in Florida. The outcomes add to the data science team’s work that presents the economic risk of tidal flooding.
+(because most raw files are stored in AWS EC2 server, I only put codings and outputs here)
 
   #2. Predicting missing income data in social surveys: a random forest approach (Poster presentation, Python)
 
