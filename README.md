@@ -3,7 +3,7 @@ With experiences in data science, social research, and marketing research, I hav
 
 To see my codings and machine learning practices, please visit #1 (R) and #2 (Python); to see my qualitative market research output, go to #3; To see my quantitative research capacity, please refer to #4 (presentation) and #5 (research paper). Below follows their brief introduction.
 
-I appreciate you for taking time to visit and take a look at my portfolios.
+I appreciate your time to visit and take a look at my portfolios. All sorts of feedback are more than welcome!
 
 #1. Estimate 3 million properties in South Florida with machine learning algorithms (First Street Foundation, R)
 
