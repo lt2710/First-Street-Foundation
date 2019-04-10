@@ -2,17 +2,17 @@
 I appreciate you for taking time to visit and take a look at my portfolios. 
 With experiences in data science, social research, and marketing research, I have been dedicated to generate insights from large-scale business, social and administrative data. Here I have stored the outcome of 4 projects, that comes from either acedemic researches that have resulted in conference presentation or publications, or from the real business data that comes from internships
 
-##1. Building machine learning algorithm to estimate 3 million properties in South Florida (First Street Foundation, R)
+#1. Building machine learning algorithm to estimate 3 million properties in South Florida (First Street Foundation, R)
 This project builds from scratch machine learning algorithms that estimates property value in a large-scale dataset of 3 million properties in Florida. The outcomes add to the data science team’s work that presents the economic risk of tidal flooding.
 
-##2. Predicting missing income data in social surveys: a random forest approach (Columbia University, Python)
+#2. Predicting missing income data in social surveys: a random forest approach (Columbia University, Python)
 I worked this project out with Weifan Xu from UC Berkley. We predicted missing values in a social survey (CFPS) to improve data quality by random forest model with 81.70% accuracy. The outcome has been made to a research poster presented at the UC Berkley.
 
-##3. Bring yerba mate to Chinese customers (Porteñas, focus groups)
+#3. Bring yerba mate to Chinese customers (Porteñas, focus groups)
 I helped Porteñas, a bar startup in Williamsburg, explore solutions for their yerba mate drink to enter Chinese market. Conducting several focus groups and interviews, as well as quantitative sequantial monadic testing, I formulated recommendations on marketing mix to hit young white collars and students and the final research report is presented.
 
-##4. Consumer segments in urban China: insights from unsupervised learning (Stata)
+#4. Consumer segments in urban China: insights from unsupervised learning (Stata)
 This is a earlier work where I constructed 3-wave panel consumers data from a relational social survey database to portrait market fluctuations in 2012-16. From the data I generalized 3 market segments with different consumption patterns by Multiple Correspondence Analysis. Here the conference presentation is attached.
 
-##5. Consumer behavior of elderly leisure in urban China (Stata)
+#5. Consumer behavior of elderly leisure in urban China (Stata)
 I conducted ethnographic observation with an elder couple and modeled consumption determinants by robust regression in R to estimate “grey market” potential. The submitted research paper is attached.
