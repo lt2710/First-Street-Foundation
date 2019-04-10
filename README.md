@@ -1,5 +1,5 @@
 # Portfolio from Langyi Tian
-With experiences in data science, social research, and marketing research, I have been dedicated to generate insights from large-scale business, social and administrative data. Here I have stored the outcome of 4 substantial projects, coming from either the real business data that comes from internships, or acedemic researches that have resulted in conference presentation and publications.
+With experiences in data science, social research, and marketing research, I have been dedicated to generate insights from large-scale business, social and administrative data. Here I have stored the outcome of 4 substantial projects, coming from either the real business problem-solving with internships, or acedemic researches that have resulted in conference presentation and publications.
 
 To see my codings and machine learning practices, please visit #1 (R) and #2 (Python); to see my qualitative market research output, go to #3; To see my quantitative research capacity, please refer to #4 (presentation) and #5 (research paper). Below follows their brief introduction.
 
