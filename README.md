@@ -14,16 +14,13 @@ This project builds from scratch machine learning algorithms that estimates prop
 
 I worked this project out with Weifan Xu from UC Berkley. We predicted missing values in a social survey (CFPS) to improve data quality by random forest model with 81.70% accuracy. The outcome has been made to a research poster presented at the UC Berkley.
 
-
   #3. Bring yerba mate to Chinese customers (Porteñas, focus groups)
 
 I helped Porteñas, a bar startup in Williamsburg, explore solutions for their yerba mate drink to enter Chinese market. Conducting several focus groups and interviews, as well as quantitative sequantial monadic testing, I formulated recommendations on marketing mix to hit young white collars and students and the final research report is presented.
 
-
   #4. Consumer segments in urban China: insights from unsupervised learning (Social Forces, Stata)
 
 This is a earlier work where I constructed 3-wave panel consumers data from a relational social survey database to portrait market fluctuations in 2012-16. From the data I generalized 3 market segments with different consumption patterns by Multiple Correspondence Analysis. Here the conference presentation is attached.
-
 
   #5. Consumer behavior of elderly leisure in urban China (Journal of Consumer Culture, Stata)
 
