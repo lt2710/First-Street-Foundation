@@ -58,10 +58,11 @@ Which one seems more convincing?
 ---
 ## Executive summary
 Objective
- - Quantify the impact through machine learning to address the concern to the financial risk of tidal flooding
- 
+ - Quantify the financial risk of tidal flooding to address stakeholder concern
+
 Data
- - The attributes and historical transaction information of all properties (&gt;3 million) in South Florida
+ -All properties (&gt;3 million) in South Florida
+ -Attributes and historical transaction information
  
 Methodology
  - Automize the selection, transformation of features
@@ -90,7 +91,8 @@ Findings
 9. Iteration through cities/counties and view corss-validated model performance
 10. Map county-level model performance
 
-*Codes are partially displayed. For full code I recommend to go to rmd file.
+*Some codes are partially displayed. For full code I recommend to go to rmd file.
+*I have signed a confidentiality agreement with First Street Foundation, and please let me know before you reuse, share, or distribute the materials.
 
 ---
 ## 0. Data science solution to the flooding risk concern
@@ -102,14 +104,13 @@ Pain point: Costal properties are highly valuable but also extremely vulnerable 
  - "I doubt we will continue to have this property in the future. (For our children)  - It's just determining the right time to sell."
 
 Data Science Solution: Quantify the impact by calculating financial loss
- - Target variable: The market value of a property
- - Supervised learning
- - A regression problem
+ - Supervised learning to target the market value of a property
+ - A regression problem to model the fluctuating numerical price
 
 ---
 
 ## 1. Data preparation
-Select relevant features from raw data, which comes from a real estate broker's data base. I'm asked to keep confidentiality about raw data so no original data table will be displayed.
+Select relevant features from raw data, which comes from a real estate broker's data base. Observations are properties and variables are relevant attributes.
 
 
 
@@ -370,10 +371,7 @@ city_obs&lt;-city_obs%&gt;%filter(city_obs$Properties&lt;20000)
 We can see we need to drop some cities due to too few samples.
 
 ```r
-ggplot(data=city_obs)+
-  geom_area(aes(x = city_obs$Properties),stat = "bin",fill = "khaki2")+
-  xlab("Numbers of properties in data")+ylab("Number of cities")+ 
-  ggtitle("Most cities have few total number of properties")+theme_classic()
+ggplot(data=city_obs)+geom_area(aes(x = city_obs$Properties),stat = "bin",fill = "khaki2")+xlab("Numbers of properties in data")+ylab("Number of cities")+ggtitle("Most cities have few total number of properties")+theme_classic()
 ```
 
 ![](slides_files/figure-html/unnamed-chunk-14-1.png)&lt;!-- --&gt;
@@ -477,8 +475,8 @@ home_county_cleaned_dta&lt;-purrr::map(home_county_cleaned_dta,drop.unary)
 Build the ability to check for key features of individual properties using Google map
 
 ```r
-#Provide an interactive leaflet for checking individual properties, Aventura as an example.
-map.variable&lt;-function(dta=home_city_cleaned_dta$`AVE MARIA`,
+#Provide an interactive leaflet for checking individual properties, Hendry County as an example.
+map.variable&lt;-function(dta=home_county_cleaned_dta$Hendry,
                        varname="propertyusegroup"){
 if (varname%in%names(dta)==TRUE&amp;
     "propertylatitude"%in%names(dta)==TRUE&amp;
@@ -729,11 +727,12 @@ model_city&lt;-modeling(home_city_cleaned_dta)
 model_county&lt;-modeling(home_county_cleaned_dta)
 ```
 
-The random forest outperforms boosting in most of the cases, across different measure of prediction accuracy. This is reasonable given our data is quite varying.
-
+---
+## 7. Test between random forest and gradient boosting
+Test in subsample of cities
 
 ```r
-cat("In",
+paste("In",
     nrow(model_city),
     "city-level subsamples,",
     model_city[model_city$rf_MSE&lt;model_city$gb_MSE,]%&gt;%nrow(),
@@ -746,11 +745,14 @@ cat("In",
 ```
 
 ```
-## In 78 city-level subsamples, 68 generate better performance measure by MSE with random forest than boosting trees. 51 by MPE. 66 by MAPE.
+## [1] "In 78 city-level subsamples, 68 generate better performance measure by MSE with random forest than boosting trees. 51 by MPE. 66 by MAPE."
 ```
+---
+## 7. Test between random forest and gradient boosting
+Test in subsample of counties
 
 ```r
-cat("In",
+paste("In",
     nrow(model_county),
     "county-level subsamples,",
     model_county[model_county$rf_MSE&lt;model_county$gb_MSE,]%&gt;%nrow(),
@@ -763,9 +765,11 @@ cat("In",
 ```
 
 ```
-## In 7 county-level subsamples, 7 generate better performance measure by MSE with random forest than boosting trees. 6 by MPE. 7 by MAPE.
+## [1] "In 7 county-level subsamples, 7 generate better performance measure by MSE with random forest than boosting trees. 6 by MPE. 7 by MAPE."
 ```
 
+The random forest outperforms boosting in most of the cases in cities/counties, across different measure of prediction accuracy. This is reasonable given our data is quite varying and is with a lot of correlated features, and the feature selection in random forest make the process more robust to different data.
+---
 ## 8. Personalize filtering parameters for random forest
 Build plotting function. We want to see if we can control what data we put in, how to do so can help us get best results.
 
@@ -813,7 +817,7 @@ Error performance for maximum observation within each model.
 
 ```r
 error_matrix&lt;-NULL
-for (i in c(100,200,300,400,500,600,700)){
+for (i in seq(100,700,by=50)){
 output&lt;-modeling(home_county_cleaned_dta,
                       price_h=5000000,
                       price_l=100,
@@ -838,7 +842,7 @@ This one looks at maximum size of sample in each model. Overall, a larger sample
 error.plot(error_matrix)
 ```
 
-![](slides_files/figure-html/unnamed-chunk-29-1.png)&lt;!-- --&gt;
+![](slides_files/figure-html/unnamed-chunk-30-1.png)&lt;!-- --&gt;
 
 ---
 ## 8. Personalize filtering parameters for random forest
@@ -847,11 +851,11 @@ Error performance for lowest price acceptable for property
 
 ```r
 error_matrix&lt;-NULL
-for (i in c(100,300,500,1000,3000,7000,10000)){
+for (i in c(100,200,300,500,700,1000,3000,5000,7000,10000)){
 output&lt;-modeling(home_county_cleaned_dta,
                       price_h=5000000,
                       price_l=i,
-                      sz=200, 
+                      sz=400, 
                       yr_st=2012)
 error_performance&lt;-cbind(i,
                          output$preprocess_retention%&gt;%mean(),
@@ -872,7 +876,7 @@ This one looks at lowest price acceptable for property. We can see there's a tra
 error.plot(error_matrix)
 ```
 
-![](slides_files/figure-html/unnamed-chunk-31-1.png)&lt;!-- --&gt;
+![](slides_files/figure-html/unnamed-chunk-32-1.png)&lt;!-- --&gt;
 
 ---
 ## 8. Personalize filtering parameters for random forest
@@ -880,11 +884,11 @@ Error performance for starting year to filter the properties
 
 ```r
 error_matrix&lt;-NULL
-for (i in c(2000,2007,2010,2013,2015,2016,2017)){
+for (i in c(2000,2004,2007,2010,2012,2014,2015,2016,2017)){
 output&lt;-modeling(home_county_cleaned_dta,
                       price_h=5000000,
                       price_l=100,
-                      sz=200, 
+                      sz=400, 
                       yr_st=i)
 error_performance&lt;-cbind(i,
                          output$preprocess_retention%&gt;%mean(),
@@ -905,18 +909,18 @@ This one looks at starting year to filter the properties. It seems constraining 
 error.plot(error_matrix)
 ```
 
-![](slides_files/figure-html/unnamed-chunk-33-1.png)&lt;!-- --&gt;
+![](slides_files/figure-html/unnamed-chunk-34-1.png)&lt;!-- --&gt;
 ---
 ## 8. Personalize filtering parameters for random forest
 Error performance for highest price acceptable for properties. 
 
 ```r
 error_matrix&lt;-NULL
-for (i in c(100000,300000,500000,700000,1000000,5000000,10000000)){
+for (i in c(100000,300000,500000,700000,1000000,3000000,5000000,7000000,10000000)){
 output&lt;-modeling(home_county_cleaned_dta,
                       price_h=i,
                       price_l=100,
-                      sz=200, 
+                      sz=400, 
                       yr_st=2012)
 error_performance&lt;-cbind(i,
                          output$preprocess_retention%&gt;%mean(),
@@ -938,7 +942,7 @@ This one looks at highest price acceptable for properties It seems
 error.plot(error_matrix)
 ```
 
-![](slides_files/figure-html/unnamed-chunk-35-1.png)&lt;!-- --&gt;
+![](slides_files/figure-html/unnamed-chunk-36-1.png)&lt;!-- --&gt;
 ---
 ## 9. Iteration through cities/counties and view corss-validated model performance
 Cities (I have to fix data table to ensure data confidentiality)
@@ -1412,7 +1416,7 @@ Different measure and attributed displayed in the map
 tmap_arrange(summary.county(varname="preprocess_retention"),summary.county(varname="obs"),summary.county(varname="vars"),summary.county(varname="rf_MSE"),summary.county(varname="rf_MPE"),summary.county(varname="rf_MAPE"),summary.county(varname="rf_1st"),summary.county(varname="rf_2nd"),summary.county(varname="rf_3rd"),ncol=3)
 ```
 
-![](slides_files/figure-html/unnamed-chunk-39-1.png)&lt;!-- --&gt;
+![](slides_files/figure-html/unnamed-chunk-40-1.png)&lt;!-- --&gt;
 ---
 ## 10. Map county-level model performance
 If we recall previous exploratory analysis, the county's performance relies quite some on the features of each individual county. For some counties which lack a considerable number of important attributes, the prediction power is small. This sugggests it's correct to model by county to avoid the data quality issue of some counties will spread to the whole sample, but how to improve the low data quality prediction can be a subsequent challenge.

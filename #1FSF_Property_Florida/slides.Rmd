@@ -81,10 +81,11 @@ Which one seems more convincing?
 ---
 ## Executive summary
 Objective
- - Quantify the impact through machine learning to address the concern to the financial risk of tidal flooding
- 
+ - Quantify the financial risk of tidal flooding to address stakeholder concern
+
 Data
- - The attributes and historical transaction information of all properties (>3 million) in South Florida
+ -All properties (>3 million) in South Florida
+ -Attributes and historical transaction information
  
 Methodology
  - Automize the selection, transformation of features
@@ -113,7 +114,8 @@ Findings
 9. Iteration through cities/counties and view corss-validated model performance
 10. Map county-level model performance
 
-*Codes are partially displayed. For full code I recommend to go to rmd file.
+*Some codes are partially displayed. For full code I recommend to go to rmd file.
+*I have signed a confidentiality agreement with First Street Foundation, and please let me know before you reuse, share, or distribute the materials.
 
 ---
 ## 0. Data science solution to the flooding risk concern
@@ -125,14 +127,13 @@ Pain point: Costal properties are highly valuable but also extremely vulnerable 
  - "I doubt we will continue to have this property in the future. (For our children)  - It's just determining the right time to sell."
 
 Data Science Solution: Quantify the impact by calculating financial loss
- - Target variable: The market value of a property
- - Supervised learning
- - A regression problem
+ - Supervised learning to target the market value of a property
+ - A regression problem to model the fluctuating numerical price
 
 ---
 
 ## 1. Data preparation
-Select relevant features from raw data, which comes from a real estate broker's data base. I'm asked to keep confidentiality about raw data so no original data table will be displayed.
+Select relevant features from raw data, which comes from a real estate broker's data base. Observations are properties and variables are relevant attributes.
 ```{r, echo=FALSE, eval=FALSE, warning=FALSE}
 #Input original data
 home_dta_original<-fread("D:/raw_data/SF_Home_Characteristics.csv") #This is original ATTOM data
@@ -337,10 +338,7 @@ city_obs<-city_obs%>%filter(city_obs$Properties<20000)
 ## 3. Seperate modeling: one model for each city/county data
 We can see we need to drop some cities due to too few samples.
 ```{r, echo=TRUE, warning=FALSE}
-ggplot(data=city_obs)+
-  geom_area(aes(x = city_obs$Properties),stat = "bin",fill = "khaki2")+
-  xlab("Numbers of properties in data")+ylab("Number of cities")+ 
-  ggtitle("Most cities have few total number of properties")+theme_classic()
+ggplot(data=city_obs)+geom_area(aes(x = city_obs$Properties),stat = "bin",fill = "khaki2")+xlab("Numbers of properties in data")+ylab("Number of cities")+ggtitle("Most cities have few total number of properties")+theme_classic()
 ```
 ---
 ## 3. Seperate modeling: one model for each city/county data
@@ -429,8 +427,8 @@ home_county_cleaned_dta<-purrr::map(home_county_cleaned_dta,drop.unary)
 ## 5. Interactivity to check individual properties within sample
 Build the ability to check for key features of individual properties using Google map
 ```{r, echo=TRUE, warning=FALSE}
-#Provide an interactive leaflet for checking individual properties, Aventura as an example.
-map.variable<-function(dta=home_city_cleaned_dta$`AVE MARIA`,
+#Provide an interactive leaflet for checking individual properties, Hendry County as an example.
+map.variable<-function(dta=home_county_cleaned_dta$Hendry,
                        varname="propertyusegroup"){
 if (varname%in%names(dta)==TRUE&
     "propertylatitude"%in%names(dta)==TRUE&
@@ -674,10 +672,11 @@ model_city<-modeling(home_city_cleaned_dta)
 model_county<-modeling(home_county_cleaned_dta)
 ```
 
-The random forest outperforms boosting in most of the cases, across different measure of prediction accuracy. This is reasonable given our data is quite varying.
-
+---
+## 7. Test between random forest and gradient boosting
+Test in subsample of cities
 ```{r, echo=TRUE, warning=FALSE}
-cat("In",
+paste("In",
     nrow(model_city),
     "city-level subsamples,",
     model_city[model_city$rf_MSE<model_city$gb_MSE,]%>%nrow(),
@@ -687,8 +686,12 @@ cat("In",
     model_city[model_city$rf_MAPE<model_city$gb_MAPE,]%>%nrow(),
     "by MAPE."
     )
-
-cat("In",
+```
+---
+## 7. Test between random forest and gradient boosting
+Test in subsample of counties
+```{r, echo=TRUE, warning=FALSE}
+paste("In",
     nrow(model_county),
     "county-level subsamples,",
     model_county[model_county$rf_MSE<model_county$gb_MSE,]%>%nrow(),
@@ -700,6 +703,8 @@ cat("In",
     )
 ```
 
+The random forest outperforms boosting in most of the cases in cities/counties, across different measure of prediction accuracy. This is reasonable given our data is quite varying and is with a lot of correlated features, and the feature selection in random forest make the process more robust to different data.
+---
 ## 8. Personalize filtering parameters for random forest
 Build plotting function. We want to see if we can control what data we put in, how to do so can help us get best results.
 ```{r, echo=TRUE, warning=FALSE}
@@ -745,7 +750,7 @@ grid.arrange(retention,mse,mape,mpe)
 Error performance for maximum observation within each model. 
 ```{r, eval=TRUE, echo=TRUE, warning=FALSE}
 error_matrix<-NULL
-for (i in c(100,200,300,400,500,600,700)){
+for (i in seq(100,700,by=50)){
 output<-modeling(home_county_cleaned_dta,
                       price_h=5000000,
                       price_l=100,
@@ -775,11 +780,11 @@ Error performance for lowest price acceptable for property
 
 ```{r, echo=TRUE, warning=FALSE}
 error_matrix<-NULL
-for (i in c(100,300,500,1000,3000,7000,10000)){
+for (i in c(100,200,300,500,700,1000,3000,5000,7000,10000)){
 output<-modeling(home_county_cleaned_dta,
                       price_h=5000000,
                       price_l=i,
-                      sz=200, 
+                      sz=400, 
                       yr_st=2012)
 error_performance<-cbind(i,
                          output$preprocess_retention%>%mean(),
@@ -804,11 +809,11 @@ error.plot(error_matrix)
 Error performance for starting year to filter the properties
 ```{r, echo=TRUE, warning=FALSE}
 error_matrix<-NULL
-for (i in c(2000,2007,2010,2013,2015,2016,2017)){
+for (i in c(2000,2004,2007,2010,2012,2014,2015,2016,2017)){
 output<-modeling(home_county_cleaned_dta,
                       price_h=5000000,
                       price_l=100,
-                      sz=200, 
+                      sz=400, 
                       yr_st=i)
 error_performance<-cbind(i,
                          output$preprocess_retention%>%mean(),
@@ -832,11 +837,11 @@ error.plot(error_matrix)
 Error performance for highest price acceptable for properties. 
 ```{r, echo=TRUE, warning=FALSE}
 error_matrix<-NULL
-for (i in c(100000,300000,500000,700000,1000000,5000000,10000000)){
+for (i in c(100000,300000,500000,700000,1000000,3000000,5000000,7000000,10000000)){
 output<-modeling(home_county_cleaned_dta,
                       price_h=i,
                       price_l=100,
-                      sz=200, 
+                      sz=400, 
                       yr_st=2012)
 error_performance<-cbind(i,
                          output$preprocess_retention%>%mean(),
