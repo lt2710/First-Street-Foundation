@@ -1,0 +1,252 @@
+---
+title: "Untitled"
+output: html_document
+---
+```{r packages, message = FALSE, warning = FALSE, echo=FALSE}
+# Load packages.
+packages <- c("tidyr", 
+              "dplyr",
+              "stringr",
+              "purrr", 
+              "data.table", 
+              "maps",
+              "glmnet",
+              "tree",
+              "knitr",
+              "ggplot2",
+              "gridExtra",
+              "rgdal",
+              "tmap",
+              "leaflet"
+              )
+packages <- lapply(packages, FUN = function(x) {
+  if(!require(x, character.only = TRUE)) {
+    install.packages(x)
+  library(x, character.only = TRUE)
+  }
+}
+)
+```
+
+```{r, echo=TRUE}
+load("parcel.RData")
+load("by_year_county.RData")
+load("by_year_use.RData")
+load("by_year_own.RData")
+load("by_year_floodrisk.RData")
+load("by_city.RData")
+load("by_city_year.RData")#Use this if you want to plot animation
+load("major_models.RData")
+```
+
+```{r,warning=FALSE,message=FALSE,echo=TRUE}
+#Plot statistics by county
+library(tmap)
+summary.county<-function(varname,par=parcel){
+m<-tm_shape(parcel) + 
+  tm_fill(varname,
+          palette = "GnBu")+
+  tm_text("NAME",size = 0.6)+
+  tm_borders(col = "black")+
+  tm_layout(
+  legend.title.size=0.8,
+  legend.text.size = 0.5,
+  legend.position = c("left","top"),
+  legend.bg.color = "white",
+  legend.bg.alpha = 0)
+return(m)
+}
+tmap_arrange(summary.county(varname="Number_of_Properties"),summary.county(varname="Average_Price"),summary.county(varname="Average_Living_Area"),summary.county(varname="Average_Built_Year"),nrow = 2)
+```
+
+
+
+```{r, echo=TRUE, warning=FALSE}
+ggplot(by_year_county[by_year_county$deedlastsaledate>1955&
+                 by_year_county$deedlastsaledate<2019&
+                 is.na(by_year_county$deedlastsaledate)==FALSE&
+                 is.na(by_year_county$county)==FALSE,],
+       aes(x = deedlastsaledate,
+           y = price,
+           color = situscounty)) +
+  scale_color_brewer(palette = "Set3")+
+  geom_line(data=by_year_county[by_year_county$deedlastsaledate>1955&
+                           by_year_county$deedlastsaledate<2019,])+
+  geom_point(data=by_year_county[by_year_county$deedlastsaledate>1955&
+                           by_year_county$deedlastsaledate<2019,])+
+  scale_x_continuous(name="Year of transaction", 
+                     breaks=c(seq(1955,2018,by=5),2018))+
+  scale_y_continuous(name="Average transaction price ($)", 
+                     breaks=seq(0,2000000,by=200000))+
+  ggtitle("Historical transaction price in each county")+
+  labs(caption = "Source: ATTOM Data Solutions")+
+  theme_classic()+
+  theme(axis.text.x=element_text(angle=30, hjust=1))
+```
+
+
+```{r, echo=TRUE, warning=FALSE}
+ggplot(by_year_use[by_year_use$deedlastsaledate>1955&
+                 by_year_use$deedlastsaledate<2019&
+                 is.na(by_year_use$deedlastsaledate)==FALSE&
+                 is.na(by_year_use$county)==FALSE,],
+       aes(x = deedlastsaledate,
+           y = price,
+           color = propertyusegroup)) +
+  scale_color_brewer(palette = "Accent")+
+  geom_line(data=by_year_use[by_year_use$deedlastsaledate>1955&
+                           by_year_use$deedlastsaledate<2019,])+
+  geom_point(data=by_year_use[by_year_use$deedlastsaledate>1955&
+                           by_year_use$deedlastsaledate<2019,])+
+  scale_x_continuous(name="Transaction year", 
+                     breaks=c(seq(1955,2018,by=5),2018))+
+  scale_y_continuous(name="Average property value ($)", 
+                     breaks=seq(0,2000000,by=200000))+
+  ggtitle("Historical price between commercial and residential properties")+
+  labs(caption = "Source: ATTOM Data Solutions")+
+  theme_classic()+
+  theme(axis.text.x=element_text(angle=30, hjust=1))
+```
+
+```{r, echo=TRUE, warning=FALSE}
+ggplot(by_year_own[by_year_own$deedlastsaledate>1955&
+                 by_year_own$deedlastsaledate<2019&
+                 is.na(by_year_own$deedlastsaledate)==FALSE&
+                 is.na(by_year_own$county)==FALSE,],
+       aes(x = deedlastsaledate,
+           y = price,
+           color = ownertypedescription1)) +
+  scale_color_brewer(palette = "Dark2")+
+  geom_line(data=by_year_own[by_year_own$deedlastsaledate>1955&
+                           by_year_own$deedlastsaledate<2019,])+
+  geom_point(data=by_year_own[by_year_own$deedlastsaledate>1955&
+                           by_year_own$deedlastsaledate<2019,])+
+  scale_x_continuous(name="Transaction year", 
+                     breaks=c(seq(1955,2018,by=5),2018))+
+  scale_y_continuous(name="Average property value ($)", 
+                     breaks=seq(0,2000000,by=200000))+
+  ggtitle("Historical price between company-ownerd and individual-owned properties")+
+  labs(caption = "Source: ATTOM Data Solutions")+
+  theme_classic()+
+  theme(axis.text.x=element_text(angle=30, hjust=1))
+```
+
+```{r, echo=TRUE, warning=FALSE}
+ggplot(by_year_floodrisk[by_year_floodrisk$deedlastsaledate>2000&
+                 by_year_floodrisk$deedlastsaledate<2019&
+                 is.na(by_year_floodrisk$deedlastsaledate)==FALSE&
+                 is.na(by_year_floodrisk$county)==FALSE,],
+       aes(x = deedlastsaledate,
+           y = price,
+           color = floodrisk1)) +
+  scale_color_brewer(palette = "Set2")+
+  geom_line(data=by_year_floodrisk[by_year_floodrisk$deedlastsaledate>2000&
+                           by_year_floodrisk$deedlastsaledate<2019,])+
+  geom_point(data=by_year_floodrisk[by_year_floodrisk$deedlastsaledate>2000&
+                           by_year_floodrisk$deedlastsaledate<2019,])+
+  scale_x_continuous(name="Year of transaction", 
+                     breaks=c(seq(2000,2018,by=5),2018))+
+  scale_y_continuous(name="Average transaction price ($)", 
+                     breaks=seq(0,2000000,by=200000))+
+  ggtitle("Average transaction price for risky assets and non-risky assets")+
+  labs(caption = "Source: ATTOM Data Solutions")+
+  theme_classic()+
+  theme(axis.text.x=element_text(angle=30, hjust=1))
+```
+
+```{r, echo=TRUE, warning=FALSE}
+ggplot(by_year_floodrisk[by_year_floodrisk$deedlastsaledate>2000&
+                 by_year_floodrisk$deedlastsaledate<2019&
+                 is.na(by_year_floodrisk$deedlastsaledate)==FALSE&
+                 is.na(by_year_floodrisk$county)==FALSE,],
+       aes(x = deedlastsaledate,
+           y = averagefrequency,
+           color = floodrisk1)) +
+  scale_color_brewer(palette = "Set2")+
+  geom_line(data=by_year_floodrisk[by_year_floodrisk$deedlastsaledate>2000&
+                           by_year_floodrisk$deedlastsaledate<2019,])+
+  geom_point(data=by_year_floodrisk[by_year_floodrisk$deedlastsaledate>2000&
+                           by_year_floodrisk$deedlastsaledate<2019,])+
+  scale_x_continuous(name="Year of transaction", 
+                     breaks=c(seq(2000,2018,by=5),2018))+
+  scale_y_continuous(name="Average transaction price ($)", 
+                     breaks=seq(0,2000000,by=200000))+
+  ggtitle("Average transaction frequency for risky assets and non-risky assets")+
+  labs(caption = "Source: ATTOM Data Solutions")+
+  theme_classic()+
+  theme(axis.text.x=element_text(angle=30, hjust=1))
+```
+
+
+```{r, echo=TRUE, warning=FALSE}
+ggplot(by_city,
+       aes(x = averagefrequency,
+           y = price,
+           size = num,
+           color= floodrisk1)) +
+  geom_point()+
+  scale_color_brewer(palette = "OrRd", 
+                     direction=-1)+
+  scale_x_continuous(name="Average transaction times in market")+
+  scale_y_continuous(name="Average property value ($)", 
+                     breaks=seq(0,2000000,by=200000))+
+  geom_text(data=by_city[by_city$num>15000,],
+            aes(label=propertyaddresscity),
+            position=position_jitter(width=1,height=1),
+            color="black",
+            size=2.5, hjust=-0.3, vjust=-0.3)+
+  ggtitle("Average property price and transaction frequency in cities with different flooding risk",
+          subtitle = "Large cities annotated")+
+  labs(caption = "Source: ATTOM Data Solutions")+
+  theme_classic()
+```
+
+```{r, echo=TRUE, warning=FALSE}
+ggplot(by_city,
+       aes(x = builtyear,
+           y = price,
+           size = num,
+           color = floodrisk1)) +
+  geom_point()+
+  scale_color_brewer(palette = "OrRd", 
+                     direction=-1)+
+  scale_x_continuous(name="Year built of property", 
+                     breaks=c(seq(1950,2018,by=5),2018))+
+  scale_y_continuous(name="Average property value ($)", 
+                     breaks=seq(0,2000000,by=200000))+
+  geom_text(data=by_city[by_city$num>15000,],
+            aes(label=propertyaddresscity),
+            position=position_jitter(width=1,height=1),
+            color= "black",size=2.5, hjust=-0.3, vjust=-0.3)+
+  ggtitle("Average property price and year built in in cities with different flooding risk",
+          subtitle = "Large cities annotated")+
+  labs(caption = "Source: ATTOM Data Solutions")+
+  theme_classic()+
+  theme(axis.text.x=element_text(angle=30, hjust=1))
+```
+
+```{r, echo=TRUE, warning=FALSE}
+ggplot(major_models,
+       aes(x = price,
+           y = floodrisk,
+           color = floodrisk1,
+           size= num,
+           shape=rf_1st)) +
+  geom_point()+
+  geom_jitter()+
+  scale_color_brewer(palette = "OrRd",
+                     direction = -1)+
+  scale_x_continuous(name="Average property value ($)", 
+                     breaks=seq(0,2000000,by=200000))+
+  scale_y_continuous(name="Level of flood risk")+
+  geom_text(data=major_models[major_models$rf_MPE<0.3&
+                                major_models$floodrisk>0.03,],
+            aes(label=propertyaddresscity),
+            color="black",
+            size=2.5, hjust=-0.3, vjust=-0.3)+
+  ggtitle("Primary factor of property value in cities",
+          subtitle = "Cities with high flood risk and high prediction accuracy (within 30%) annotated")+
+  labs(caption = "Source: ATTOM Data Solutions")+
+  theme_classic()+
+  theme(axis.text.x=element_text(angle=30, hjust=1))
+```
