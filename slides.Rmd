@@ -28,6 +28,7 @@ packages <- c("tidyr",
               "purrr", 
               "data.table", 
               "maps",
+              "glmnet",
               "tree",
               "knitr",
               "ggplot2",
@@ -47,9 +48,17 @@ packages <- lapply(packages, FUN = function(x) {
 
 ```{r setup, include=FALSE}
 library("knitr")
-knitr::opts_chunk$set(echo = TRUE, eval=TRUE, 
-                      message=FALSE, warning = FALSE,
-                      fig.height=5, fig.width=9, cache = TRUE, cache.lazy = FALSE) 
+knitr::opts_chunk$set(
+  echo = FALSE,
+  eval = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  figure.height = 7,
+  figure.width = 15,
+  figure.align = "center",
+  cache = TRUE,
+  cache.lazy = FALSE
+)
 options(htmltools.dir.version = FALSE)
 ```  
 
@@ -134,13 +143,10 @@ Data Science Solution: Quantify the impact by calculating financial loss
 
 ## 1. Data preparation
 Select relevant features from raw data, which comes from a real estate broker's data base. Observations are properties and variables are relevant attributes.
-```{r, echo=FALSE, eval=FALSE, warning=FALSE}
-#Input original data
-home_dta_original<-fread("D:/raw_data/SF_Home_Characteristics.csv") #This is original ATTOM data
-```
-
-```{r, eval=FALSE, warning=FALSE}
-#Select features to import
+```{r}
+#Input original dataset 1: property data
+home_dta_original<-fread("D:/raw_data/SF_Home_Characteristics.csv")
+#Select features to import, subset and save
 home_dta<-select(home_dta_original,
                  attomid,#Matching ID
                  deedlastsaleprice,#Transaction price last sale
@@ -162,9 +168,35 @@ home_dta<-select(home_dta_original,
 save(home_dta,file = "D:/Langyi/Taxassessor_reduced.RData")
 ```
 
+```{r, eval=FALSE,echo=FALSE, warning=FALSE}
+#Import dataset 2: property and environmental risk, subset and save
+risk_dta_original<-fread("D:/raw_data/SF_Parcel_Risk_and_Spatial_Data.csv")
+risk_dta<-risk_dta_original%>%select(attomid=ATTOM_ID,
+                                     dist_coast,
+                                     mdkt32,
+                                     Totpopbg:near_reading_rates,
+                                     )
+save(risk_dta,file = "D:/Langyi/SF_Parcel_Risk_and_Spatial_Data_reduced.RData")
+```
+
+```{r, eval=FALSE, echo=FALSE, warning=FALSE}
+#Import dataset 3: property transactions, subset and save
+trans_dta_original<-fread("D:/raw_data/SF_Sales_Transactions_Data.csv")
+trans_dta<-trans_dta_original%>%group_by(attomid)%>%summarize(trans_times=n())
+save(trans_dta,file = "D:/Langyi/SF_Sales_Transactions_Data_reduced.RData")
+```
+
 ```{r, echo=FALSE, warning=FALSE}
-home_data<-load("D:/Langyi/Taxassessor_reduced.RData")
-#Store a stage version of data here
+#Load saved RData
+load("D:/Langyi/Taxassessor_reduced.RData")
+load("D:/Langyi/SF_Parcel_Risk_and_Spatial_Data_reduced.RData")
+home_dta<-left_join(home_dta,risk_dta,by="attomid")
+load("D:/Langyi/SF_Sales_Transactions_Data_reduced.RData")
+home_dta<-left_join(home_dta,trans_dta,by="attomid")
+```
+
+```{r, echo=FALSE, warning=FALSE}
+#Store (and report) a current version of data here
 report.dim<-function(dta){
   cat("Up to here, the data dimension is",
     dim(dta)[1],
@@ -190,11 +222,16 @@ home_dta$deedlastsaledate[home_dta$deedlastsaledate==""]<-NA
 #Make id numeric
 home_dta$attomid<-home_dta$attomid%>%as.numeric()
 #Recoding ownership type misseallenous to NA
-home_dta$ownertypedescription1[home_dta$ownertypedescription1=="NP"]<-NA
-home_dta$ownertypedescription1[home_dta$ownertypedescription1=="UNKNOWN"]<-NA
-home_dta$ownertypedescription2[home_dta$ownertypedescription1=="NP"]<-NA
-home_dta$ownertypedescription2[home_dta$ownertypedescription1=="UNKNOWN"]<-NA
+home_dta$ownertypedescription1[home_dta$ownertypedescription1=="NP"|
+                                 home_dta$ownertypedescription1=="UNKNOWN"|
+                                 home_dta$ownertypedescription1==""|
+                                 is.na(home_dta$ownertypedescription1)==TRUE]<-0
+home_dta$ownertypedescription2[home_dta$ownertypedescription2=="NP"|
+                                 home_dta$ownertypedescription2=="UNKNOWN"|
+                                 home_dta$ownertypedescription2==""|
+                                 is.na(home_dta$ownertypedescription2)==TRUE]<-0
 ```
+
 ---
 ## 1. Data preparation
 Recoding and transforming features (cont'd)
@@ -202,17 +239,75 @@ Recoding and transforming features (cont'd)
 #Recoding property usage group
 home_dta$propertyusegroup[home_dta$propertyusegroup=="UNKNOWN"|
                             home_dta$propertyusegroup=="Other"|
-                            home_dta$propertyusegroup=="NP"]<-NA
+                            home_dta$propertyusegroup=="NP"|
+                            is.na(home_dta$propertyusegroup)==TRUE]<-0
 #Note that 152 PropertyUseStandardized is better coded by, should do this in future
-class_coding<-read.csv("D:/raw_data/prop_use_codes_trim.csv")
+#class_coding<-read.csv("D:/raw_data/prop_use_codes_trim.csv")
 #Excluding <50 sq. feet living area
 home_dta$areabuilding[home_dta$areabuilding<50]<-NA
 ```
+
+---
+## 1. Data preparation
+Drop unary features at aggregated level
+```{r, echo=TRUE, warning=FALSE}
+#Drop unary variables in dataset
+drop.unary<-function(dta){
+  for (i in names(dta)[-1:-14]){
+    var<-dta[[i]]
+    var<-var[is.na(var)==FALSE]
+    if ((var%>%unique()%>%length()==1)|
+        (var%>%unique()%>%length()==0)){
+    dta<-dta%>%select(-i)
+    }
+  }
+  return(dta)
+}
+home_dta<-home_dta%>%drop.unary()
+home_dta_ver1.5<-home_dta
+home_dta_ver1.5%>%report.dim()
+```
+
+---
+##1. Data preparation
+Recoding and transforming features (cont'd)
+```{r, echo=TRUE, warning=FALSE}
+#Drop variables with too many levels, besides those are numerical
+screen_names<-home_dta%>%select()
+for (i in names(home_dta)[-44:-91]){
+  if (i>14){
+    if ((home_dta[[i]]%>%unique()%>%length()>10)&
+        (str_detect(i,pattern = "area")==FALSE)&
+        (str_detect(i,pattern = "count")==FALSE)&
+        (!i%in%c("dist_coast","mdkt32","trans_times"))
+        ){
+    print(i)
+    home_dta<-home_dta%>%select(-i)
+    }
+  }
+}
+#Store a stage version of data here
+home_dta_ver2<-home_dta
+home_dta_ver2%>%report.dim()
+```
+
+---
+##1. Data preparation
+Recoding and transforming features (cont'd)
+```{r, echo=TRUE, warning=FALSE}
+#Give value 0 for NAs in less improtant variables so the obs will not be deleted
+for (i in names(home_dta)[-1:-14]){
+    home_dta[[i]][is.na(home_dta[[i]])==TRUE|
+                    home_dta[[i]]==""|
+                    home_dta[[i]]=="NA"]<-0
+}
+```
+
 ---
 ## 1. Data preparation
 Recoding and transforming features (cont'd)
 ```{r, echo=TRUE, warning=FALSE}
-#As tree modeling does not accept character vector, those in the data are recoded to factors.
+#Recoded characters to factors.
 cat("These variables are recoded to factors")
 for (i in names(home_dta)){
   if (class(home_dta[[i]])=="character"){
@@ -221,22 +316,32 @@ for (i in names(home_dta)){
   }
 }
 ```
+
 ---
-##1. Data preparation
-Recoding and transforming features (cont'd)
+
+## 1. Data preparation
 ```{r, echo=TRUE, warning=FALSE}
-#Drop variables with too many levels, besides those are numerical
-for (i in names(home_dta)[-1:-14]){
-    if ((home_dta[[i]]%>%unique()%>%length()>3)&
-        (str_detect(i,pattern = "area|count")==FALSE)
-        ){
-    print(i)
-    home_dta<-home_dta%>%select(-i)
-    }
-}
+#Get a list of large cities sufficient for consideration
+city_obs<-group_by(home_dta,propertyaddresscity)%>%summarise(n())
+names(city_obs)[1]<-"City"
+names(city_obs)[2]<-"Properties"
+city_obs<-city_obs%>%filter(city_obs$Properties<20000)
+```
+
+---
+## 1. Data preparation
+Drop cities with sample size too small to go into tree model.
+```{r, echo=TRUE, warning=FALSE}
+#For obtaining sufficient number of obs in each model, we drop cities with <5000 obs.
+city_obs<-city_obs[-1,]
+city_obs<-city_obs%>%filter(city_obs$Properties>1000)%>%as.data.frame()
+city_obs$Properties<-NULL
+names(city_obs)[1]<-"propertyaddresscity"
+home_dta_less_city<-home_dta%>%inner_join(city_obs,key = "prepertyaddresscity")
+home_dta<-home_dta_less_city
 #Store a stage version of data here
-home_dta_ver2<-home_dta
-home_dta_ver2%>%report.dim()
+home_dta_ver3<-home_dta_less_city
+home_dta_ver3%>%report.dim()
 ```
 
 ---
@@ -244,36 +349,88 @@ home_dta_ver2%>%report.dim()
 Plot summary graph of a few important variables to understand their overall statistical distribution
 ```{r, echo=TRUE, warning=FALSE}
 #Plot summary of a few important variables
-summary.numeric<-function(varname="deedlastsaleprice",
+summary.variable<-function(varname="deedlastsaleprice",
                         dta=home_dta){
-m<-ggplot(data=dta)+
+  #For numeric variables
+  if (class(dta[[varname]])=="numeric"){
+    m<-ggplot(data=dta)+
   geom_area(aes(x = dta[[varname]]),
                  stat = "bin",
             fill = "khaki2"
            )+
-  xlab(varname)+
+  xlab(paste(varname,class(dta[[varname]])))+
   ylab("Properties")+
-  theme_classic()
-return(m)
-}
-summary.categorical<-function(varname="propertyusegroup",
-                        dta=home_dta){
-m<-ggplot(data=dta)+
+  theme_classic()+
+  theme(axis.text.x=element_text(angle=30, hjust=1))
+  }
+  #For integers
+  if (class(dta[[varname]])=="integer"){
+    m<-ggplot(data=dta)+
+  geom_area(aes(x = dta[[varname]]),
+                 stat = "bin",
+            fill = "khaki2"
+           )+
+  xlab(paste(varname,class(dta[[varname]])))+
+  ylab("Properties")+
+  theme_classic()+
+  theme(axis.text.x=element_text(angle=30, hjust=1))
+  }
+  #For factors
+  if (class(dta[[varname]])=="factor"){
+    m<-ggplot(data=dta)+
   geom_bar(aes(x = dta[[varname]]),
             fill = "khaki2"
            )+
-  xlab(varname)+
+  xlab(paste(varname,class(dta[[varname]])))+
   ylab("Properties")+
-  theme_classic()
-return(m)
+  theme_classic()+
+  theme(axis.text.x=element_text(angle=30, hjust=1))
+  }
+  #For logicals
+  if (class(dta[[varname]])=="logical"){
+    m<-ggplot(data=dta)+
+  geom_bar(aes(x = dta[[varname]]),
+            fill = "khaki2"
+           )+
+  xlab(paste(varname,class(dta[[varname]])))+
+  ylab("Properties")+
+  theme_classic()+
+  theme(axis.text.x=element_text(angle=30, hjust=1))
+  }
+  return(m)
 }
 ```
----
-## 2. Exploratory analysis
-We can see some cycles in the date variables, especially around 2008. The main body of property ownership is individual, and most houses are for residential purposes. 
+
 
 ```{r, echo=TRUE, warning=FALSE}
-grid.arrange(summary.numeric("deedlastsaledate"),summary.numeric("deedlastsaleprice"),summary.numeric("yearbuilt"),summary.numeric("areabuilding"),summary.categorical("propertyusegroup"),summary.categorical("ownertypedescription1"),summary.categorical("ownertypedescription2"),ncol=2)
+var_plots<-lapply(colnames(home_dta), summary.variable)
+grid_plot<-function(start_num=1){
+grid.arrange(var_plots[[start_num]],
+                var_plots[[start_num+1]],
+                var_plots[[start_num+2]],
+                var_plots[[start_num+3]],
+                var_plots[[start_num+4]],
+                var_plots[[start_num+5]],
+                var_plots[[start_num+6]],
+                var_plots[[start_num+7]],
+                var_plots[[start_num+8]],
+             var_plots[[start_num+9]],
+             var_plots[[start_num+10]],
+             var_plots[[start_num+11]],
+             var_plots[[start_num+12]],
+             var_plots[[start_num+13]],
+             var_plots[[start_num+14]],
+             var_plots[[start_num+15]],
+             var_plots[[start_num+16]],
+             var_plots[[start_num+17]],
+             var_plots[[start_num+18]],
+             var_plots[[start_num+19]]
+             ) 
+}
+```
+
+```{r, eval=FALSE, echo=TRUE, warning=FALSE}
+grid_plot(1)
 ```
 
 ---
@@ -290,32 +447,319 @@ county_summary<-home_dta%>%group_by(situscounty)%>%summarize(n()%>%as.numeric(),
                                                     mean(deedlastsaleprice%>%as.numeric(),na.rm = TRUE),
                                              mean(yearbuilt%>%as.numeric(),na.rm = TRUE),
                                           mean(areabuilding%>%as.numeric(),na.rm = TRUE))
-names(county_summary)<-c("NAME","Num_of_Properties","Average_Price","Average_Built_Year","Average_Living_Area")
+names(county_summary)<-c("NAME",
+                         "Number_of_Properties",
+                         "Average_Price","Average_Built_Year",
+                         "Average_Living_Area")
 parcel@data<-inner_join(parcel@data,county_summary,by="NAME")
+#save(parcel,file = "D:/Langyi/graph_data/parcel.RData")
 ```
 
 ---
 ## 2. Exploratory analysis
-Summarize a few key variables by county (cont'd)
 ```{r,warning=FALSE,message=FALSE,echo=TRUE}
 #Plot statistics by county
+options(scipen = 10)
 library(tmap)
 summary.county<-function(varname,par=parcel){
 m<-tm_shape(parcel) + 
-  tm_fill(varname)+
+  tm_fill(varname,
+          palette = "GnBu")+
   tm_text("NAME",size = 0.6)+
-  tm_borders()
+  tm_borders(col = "black")+
+  tm_layout(
+  legend.title.size=0.8,
+  legend.text.size = 0.5,
+  legend.position = c("left","top"),
+  legend.bg.color = "white",
+  legend.bg.alpha = 0)
 return(m)
 }
+tmap_arrange(summary.county(varname="Number_of_Properties"),
+             summary.county(varname="Average_Price"),
+             summary.county(varname="Average_Living_Area"),
+             summary.county(varname="Average_Built_Year"),
+             nrow = 2)
 ```
+
 ---
 ## 2. Exploratory analysis
-Summarize a few key variables by county (cont'd)
-We can see considerable geographical variation in the map. Miami-dade, Broward and Palm Beach has many big houses, while are relatively old and cheap. On the other hand, counties over the left are having new and expensive houses.
-
-```{r,warning=FALSE,message=FALSE,echo=TRUE}
-tmap_arrange(summary.county(varname="Num_of_Properties"),summary.county(varname="Average_Living_Area"),summary.county(varname="Average_Price"),summary.county(varname="Average_Built_Year"),nrow = 2)
+```{r, echo=TRUE, warning=FALSE}
+by_year_county<-home_dta%>%group_by(situscounty,deedlastsaledate)%>%summarize(num=n(),
+                                                                                           price=median(deedlastsaleprice,na.rm=TRUE),
+                                                  area=mean(areabuilding,na.rm=TRUE),
+                                              averageprice=mean(deedlastsaleprice/areabuilding,na.rm=TRUE),
+                                                  builtyear=mean(yearbuilt,na.rm=TRUE))
+#save(by_year_county,file = "D:/Langyi/graph_data/by_year_county.RData")
 ```
+
+---
+## 2. Exploratory analysis
+```{r, echo=TRUE, warning=FALSE}
+ggplot(by_year_county[by_year_county$deedlastsaledate>1955&
+                 by_year_county$deedlastsaledate<2019&
+                 is.na(by_year_county$deedlastsaledate)==FALSE&
+                 is.na(by_year_county$county)==FALSE,],
+       aes(x = deedlastsaledate,
+           y = price,
+           color = situscounty)) +
+  scale_color_brewer(palette = "Set3")+
+  geom_line(data=by_year_county[by_year_county$deedlastsaledate>1955&
+                           by_year_county$deedlastsaledate<2019,])+
+  geom_point(data=by_year_county[by_year_county$deedlastsaledate>1955&
+                           by_year_county$deedlastsaledate<2019,])+
+  scale_x_continuous(name="Year of transaction", 
+                     breaks=c(seq(1955,2018,by=5),2018))+
+  scale_y_continuous(name="Average transaction price ($)", 
+                     breaks=seq(0,2000000,by=200000))+
+  ggtitle("Historical transaction price in each county")+
+  labs(caption = "Source: ATTOM Data Solutions")+
+  theme_classic()+
+  theme(axis.text.x=element_text(angle=30, hjust=1))
+```
+
+add transaction num by year
+
+---
+## 2. Exploratory analysis
+```{r, echo=TRUE, warning=FALSE}
+by_year_use<-home_dta[home_dta$propertyusegroup!=0,]%>%group_by(propertyusegroup,deedlastsaledate)%>%summarize(num=n(),
+                                                                                           price=median(deedlastsaleprice,na.rm=TRUE),
+                                                  area=mean(areabuilding,na.rm=TRUE),
+                                              averageprice=mean(deedlastsaleprice/areabuilding,na.rm=TRUE),
+                                                  builtyear=mean(yearbuilt,na.rm=TRUE)
+                                                  )
+#save(by_year_use,file = "D:/Langyi/graph_data/by_year_use.RData")
+```
+
+---
+## 2. Exploratory analysis
+```{r, echo=TRUE, warning=FALSE}
+ggplot(by_year_use[by_year_use$deedlastsaledate>1955&
+                 by_year_use$deedlastsaledate<2019&
+                 is.na(by_year_use$deedlastsaledate)==FALSE&
+                 is.na(by_year_use$county)==FALSE,],
+       aes(x = deedlastsaledate,
+           y = price,
+           color = propertyusegroup)) +
+  scale_color_brewer(palette = "Dark2")+
+  geom_line(data=by_year_use[by_year_use$deedlastsaledate>1955&
+                           by_year_use$deedlastsaledate<2019,])+
+  geom_point(data=by_year_use[by_year_use$deedlastsaledate>1955&
+                           by_year_use$deedlastsaledate<2019,])+
+  scale_x_continuous(name="Transaction year", 
+                     breaks=c(seq(1955,2018,by=5),2018))+
+  scale_y_continuous(name="Average property value ($)", 
+                     breaks=seq(0,2000000,by=200000))+
+  ggtitle("Historical price between commercial and residential properties")+
+  labs(caption = "Source: ATTOM Data Solutions")+
+  theme_classic()+
+  theme(axis.text.x=element_text(angle=30, hjust=1))
+```
+
+
+---
+## 2. Exploratory analysis
+```{r, echo=TRUE, warning=FALSE}
+by_year_own<-home_dta[home_dta$ownertypedescription1!=0,]%>%group_by(ownertypedescription1,deedlastsaledate)%>%summarize(num=n(),
+                                                                                           price=median(deedlastsaleprice,na.rm=TRUE),
+                                                  area=mean(areabuilding,na.rm=TRUE),
+                                              averageprice=mean(deedlastsaleprice/areabuilding,na.rm=TRUE),
+                                                  builtyear=mean(yearbuilt,na.rm=TRUE)
+                                                  )
+#save(by_year_own,file = "D:/Langyi/graph_data/by_year_own.RData")
+```
+
+---
+## 2. Exploratory analysis
+```{r, echo=TRUE, warning=FALSE}
+ggplot(by_year_own[by_year_own$deedlastsaledate>1955&
+                 by_year_own$deedlastsaledate<2019&
+                 is.na(by_year_own$deedlastsaledate)==FALSE&
+                 is.na(by_year_own$county)==FALSE,],
+       aes(x = deedlastsaledate,
+           y = price,
+           color = ownertypedescription1)) +
+  scale_color_brewer(palette = "Accent")+
+  geom_line(data=by_year_own[by_year_own$deedlastsaledate>1955&
+                           by_year_own$deedlastsaledate<2019,])+
+  geom_point(data=by_year_own[by_year_own$deedlastsaledate>1955&
+                           by_year_own$deedlastsaledate<2019,])+
+  scale_x_continuous(name="Transaction year", 
+                     breaks=c(seq(1955,2018,by=5),2018))+
+  scale_y_continuous(name="Average property value ($)", 
+                     breaks=seq(0,2000000,by=200000))+
+  ggtitle("Historical price between company-ownerd and individual-owned properties")+
+  labs(caption = "Source: ATTOM Data Solutions")+
+  theme_classic()+
+  theme(axis.text.x=element_text(angle=30, hjust=1))
+```
+
+```{r, echo=TRUE, warning=FALSE}
+home_dta_flood<-home_dta
+med_dist_coast<-median(home_dta_flood$dist_coast,na.rm = TRUE)
+med_floodrisk<-median(home_dta_flood$mdkt32,na.rm = TRUE)
+home_dta_flood$dist_coast1<-NA
+home_dta_flood$dist_coast1[home_dta_flood$dist_coast<=med_dist_coast]<-"no flood risk"
+home_dta_flood$dist_coast1[home_dta_flood$dist_coast>med_dist_coast]<-"with flood risk"
+home_dta_flood$dist_coast1<-home_dta_flood$dist_coast1%>%as.character()
+home_dta_flood$floodrisk1<-NA
+home_dta_flood$floodrisk1[home_dta_flood$mdkt32<=med_floodrisk]<-"no flood risk"
+home_dta_flood$floodrisk1[home_dta_flood$mdkt32>med_floodrisk]<-"with flood risk"
+home_dta_flood$floodrisk1<-home_dta_flood$floodrisk1%>%as.character()
+by_year_floodrisk<-home_dta_flood%>%group_by(floodrisk1,deedlastsaledate)%>%summarize(num=n(),
+                                                                                           price=median(deedlastsaleprice,na.rm=TRUE),
+                                                  area=mean(areabuilding,na.rm=TRUE),
+                                              averageprice=mean(deedlastsaleprice/areabuilding,na.rm=TRUE),
+                                              averagefrequency=mean(trans_times,na.rm=TRUE),
+                                                  builtyear=mean(yearbuilt,na.rm=TRUE))
+#save(by_year_floodrisk,file = "D:/Langyi/graph_data/by_year_floodrisk.RData")
+```
+
+---
+## 2. Exploratory analysis
+```{r, echo=TRUE, warning=FALSE}
+ggplot(by_year_floodrisk[by_year_floodrisk$deedlastsaledate>2000&
+                 by_year_floodrisk$deedlastsaledate<2019&
+                 is.na(by_year_floodrisk$deedlastsaledate)==FALSE&
+                 is.na(by_year_floodrisk$county)==FALSE,],
+       aes(x = deedlastsaledate,
+           y = price,
+           color = floodrisk1)) +
+  scale_color_brewer(palette = "Set2")+
+  geom_line(data=by_year_floodrisk[by_year_floodrisk$deedlastsaledate>2000&
+                           by_year_floodrisk$deedlastsaledate<2019,])+
+  geom_point(data=by_year_floodrisk[by_year_floodrisk$deedlastsaledate>2000&
+                           by_year_floodrisk$deedlastsaledate<2019,])+
+  scale_x_continuous(name="Year of transaction", 
+                     breaks=c(seq(2000,2018,by=5),2018))+
+  scale_y_continuous(name="Average transaction price ($)", 
+                     breaks=seq(0,2000000,by=200000))+
+  ggtitle("Average transaction price for risky assets and non-risky assets")+
+  labs(caption = "Source: ATTOM Data Solutions")+
+  theme_classic()+
+  theme(axis.text.x=element_text(angle=30, hjust=1))
+```
+
+
+```{r, echo=TRUE, warning=FALSE}
+ggplot(by_year_floodrisk[by_year_floodrisk$deedlastsaledate>2000&
+                 by_year_floodrisk$deedlastsaledate<2019&
+                 is.na(by_year_floodrisk$deedlastsaledate)==FALSE&
+                 is.na(by_year_floodrisk$county)==FALSE,],
+       aes(x = deedlastsaledate,
+           y = averagefrequency,
+           color = floodrisk1)) +
+  scale_color_brewer(palette = "Set2")+
+  geom_line(data=by_year_floodrisk[by_year_floodrisk$deedlastsaledate>2000&
+                           by_year_floodrisk$deedlastsaledate<2019,])+
+  geom_point(data=by_year_floodrisk[by_year_floodrisk$deedlastsaledate>2000&
+                           by_year_floodrisk$deedlastsaledate<2019,])+
+  scale_x_continuous(name="Year of transaction", 
+                     breaks=c(seq(2000,2018,by=5),2018))+
+  scale_y_continuous(name="Average transaction price ($)", 
+                     breaks=seq(0,2000000,by=200000))+
+  ggtitle("Average transaction frequency for risky assets and non-risky assets")+
+  labs(caption = "Source: ATTOM Data Solutions")+
+  theme_classic()+
+  theme(axis.text.x=element_text(angle=30, hjust=1))
+```
+
+---
+## 2. Exploratory analysis
+```{r, echo=TRUE, warning=FALSE}
+by_city<-home_dta_flood%>%group_by(propertyaddresscity)%>%summarize(num=n(),
+                                                              county=unique(situscounty)[1],
+                                                                                           price=median(deedlastsaleprice,na.rm=TRUE),
+                                                  area=median(areabuilding,na.rm=TRUE),
+                                              averageprice=median(deedlastsaleprice/areabuilding,na.rm=TRUE),
+                                              averagefrequency=mean(trans_times,na.rm=TRUE),
+                                              builtyear=median(yearbuilt,na.rm=TRUE),
+                                              floodrisk=mean(mdkt32,na.rm = TRUE)
+                                                  )
+med_floodrisk<-median(by_city$floodrisk,na.rm = TRUE)
+by_city$floodrisk1<-NA
+by_city$floodrisk1[by_city$floodrisk==0]<-"no flood risk"
+by_city$floodrisk1[by_city$floodrisk<=med_floodrisk&
+                     by_city$floodrisk>0]<-"low flood risk"
+by_city$floodrisk1[by_city$floodrisk>med_floodrisk]<-"high flood risk"
+by_city$floodrisk1<-by_city$floodrisk1%>%as.character()
+#save(by_city,file = "D:/Langyi/graph_data/by_city.RData")
+```
+
+
+```{r, eval=FALSE,echo=TRUE, warning=FALSE}
+by_city_year<-home_dta_flood%>%group_by(propertyaddresscity,deedlastsaledate)%>%summarize(num=n(),
+                                                              county=unique(situscounty)[1],
+                                                                                           price=median(deedlastsaleprice,na.rm=TRUE),
+                                                  area=median(areabuilding,na.rm=TRUE),
+                                              averageprice=median(deedlastsaleprice/areabuilding,na.rm=TRUE),
+                                              averagefrequency=mean(trans_times,na.rm=TRUE),
+                                              builtyear=median(yearbuilt,na.rm=TRUE),
+                                              floodrisk=mean(mdkt32,na.rm = TRUE)
+                                                  )
+med_floodrisk<-median(by_city_year$floodrisk,na.rm = TRUE)
+by_city_year$floodrisk1<-NA
+by_city_year$floodrisk1[by_city_year$floodrisk==0]<-"no flood risk"
+by_city_year$floodrisk1[by_city_year$floodrisk<=med_floodrisk&
+                     by_city_year$floodrisk>0]<-"low flood risk"
+by_city_year$floodrisk1[by_city_year$floodrisk>med_floodrisk]<-"high flood risk"
+by_city_year$floodrisk1<-by_city_year$floodrisk1%>%as.character()
+#save(by_city_year,file = "D:/Langyi/graph_data/by_city_year.RData")
+```
+
+---
+## 2. Exploratory analysis
+```{r, echo=TRUE, warning=FALSE}
+ggplot(by_city,
+       aes(x = averagefrequency,
+           y = price,
+           size = num,
+           color= floodrisk1)) +
+  geom_point()+
+  scale_color_brewer(palette = "OrRd", 
+                     direction=-1)+
+  scale_x_continuous(name="Average transaction times in market")+
+  scale_y_continuous(name="Average property value ($)", 
+                     breaks=seq(0,2000000,by=200000))+
+  geom_text(data=by_city[by_city$num>15000,],
+            aes(label=propertyaddresscity),
+            position=position_jitter(width=1,height=1),
+            color="black",
+            size=2.5, hjust=-0.3, vjust=-0.3)+
+  ggtitle("Average property price and transaction frequency in cities with different flooding risk",
+          subtitle = "Large cities annotated")+
+  labs(caption = "Source: ATTOM Data Solutions")+
+  theme_classic()
+```
+
+---
+## 2. Exploratory analysis
+```{r, echo=TRUE, warning=FALSE}
+ggplot(by_city,
+       aes(x = builtyear,
+           y = price,
+           size = num,
+           color = floodrisk1)) +
+  geom_point()+
+  scale_color_brewer(palette = "OrRd", 
+                     direction=-1)+
+  scale_x_continuous(name="Year built of property", 
+                     breaks=c(seq(1950,2018,by=5),2018))+
+  scale_y_continuous(name="Average property value ($)", 
+                     breaks=seq(0,2000000,by=200000))+
+  geom_text(data=by_city[by_city$num>15000,],
+            aes(label=propertyaddresscity),
+            position=position_jitter(width=1,height=1),
+            color= "black",size=2.5, hjust=-0.3, vjust=-0.3)+
+  ggtitle("Average property price and year built in in cities with different flooding risk",
+          subtitle = "Large cities annotated")+
+  labs(caption = "Source: ATTOM Data Solutions")+
+  theme_classic()+
+  theme(axis.text.x=element_text(angle=30, hjust=1))
+```
+
+
 
 ---
 ## 3. Seperate modeling: one model for each city/county data
@@ -326,41 +770,14 @@ Inspired by the "submarket" idea
  
 Feature structure vary by county
  - There are some variables that represent housing attributes that miss in data with different cases between counties.
-
-```{r, echo=TRUE, warning=FALSE}
-#The city variable is messy, so need to visualize first
-city_obs<-group_by(home_dta,propertyaddresscity)%>%summarise(n())
-names(city_obs)[1]<-"City"
-names(city_obs)[2]<-"Properties"
-city_obs<-city_obs%>%filter(city_obs$Properties<20000)
-```
----
-## 3. Seperate modeling: one model for each city/county data
-We can see we need to drop some cities due to too few samples.
-```{r, echo=TRUE, warning=FALSE}
-ggplot(data=city_obs)+geom_area(aes(x = city_obs$Properties),stat = "bin",fill = "khaki2")+xlab("Numbers of properties in data")+ylab("Number of cities")+ggtitle("Most cities have few total number of properties")+theme_classic()
-```
----
-## 3. Seperate modeling: one model for each city/county data
-Drop cities with sample size too small to go into tree model.
-```{r, echo=TRUE, warning=FALSE}
-#For obtaining sufficient number of obs in each model, we drop cities with <1000 obs.
-city_obs<-city_obs[-1,]
-city_obs<-city_obs%>%filter(city_obs$Properties>1000)%>%as.data.frame()
-city_obs$Properties<-NULL
-names(city_obs)[1]<-"propertyaddresscity"
-home_dta_less_city<-home_dta%>%inner_join(city_obs,key = "prepertyaddresscity")
-#Store a stage version of data here
-home_dta_ver3<-home_dta
-home_dta_ver3%>%report.dim()
-#Split data
-home_dta_less_city$propertyaddresscity<-home_dta_less_city$propertyaddresscity%>%as.character()
-home_city_dta<-split(home_dta_less_city,home_dta_less_city$propertyaddresscity)
-```
+ 
 ---
 ## 3. Seperate modeling: one model for each city/county data
 The process for county-level modeling is rather straightforward.
 ```{r, echo=TRUE, warning=FALSE}
+#Split data
+home_dta_less_city$propertyaddresscity<-home_dta_less_city$propertyaddresscity%>%as.character()
+home_city_dta<-split(home_dta_less_city,home_dta_less_city$propertyaddresscity)
 home_county_dta<-split(select(home_dta,-censustract),home_dta$situscounty)
 ```
 
@@ -394,27 +811,10 @@ drop.missing<-function(dta){
   return(dta)
 }
 ```
----
-## 4. Feature selection with individual models
-Build function to automatically drop variables that have no variation therefore serve for no prediction purpose
-```{r, echo=TRUE, warning=FALSE}
-#Drop unary variables
-drop.unary<-function(dta){
-  for (i in names(dta)[-1:-5]){
-    var<-dta[[i]]
-    var<-var[is.na(var)==FALSE]
-    if ((var%>%unique()%>%length()==1)|
-        (var%>%unique()%>%length()==0)){
-    dta<-dta%>%select(-i)
-    }
-  }
-  return(dta)
-}
-```
 
 ---
 ## 4. Feature selection with individual models
-Apply the 2 selection functions built just now to all subsamples
+Apply the selection functions built just now to all subsamples
 ```{r, echo=TRUE, warning=FALSE}
 #Apply to city the function in previous function for feature selection
 home_city_cleaned_dta<-purrr::map(home_city_dta,drop.missing)
@@ -460,7 +860,7 @@ leaflet(dta) %>%
 ---
 ## 5. Interactivity to check individual properties within sample
 Build the ability to check for key features of individual properties using Google map
-```{r, echo=TRUE, warning=FALSE}
+```{r, eval=FALSE,echo=TRUE, warning=FALSE}
 map.variable(dta = home_city_cleaned_dta$AVENTURA)
 ```
 
@@ -481,8 +881,7 @@ dta$propertylongitude<-NULL
   if ("censustract"%in%names(dta)){
     if (dta$censustract%>%unique()%>%length()<32){
       dta$censustract<-dta$censustract%>%as.factor()
-    }
-    else {
+    }else {
       dta<-dta%>%select(-censustract)
     }
   }
@@ -507,6 +906,7 @@ set.seed(0)
   if (nrow(dta)>=size){
     dta<-sample_n(dta,size)
   }
+dta<-drop.unary(dta)
 return(dta)
 }
 ```
@@ -518,7 +918,7 @@ I decided to use random forest and gradient boosting as the first try. Random fo
 Here a model comparison with output from random forest and gradient boosting is built. It will generate several attributes of the model as well as some key performance index of the 2 tree algorithms.
 
 ```{r, echo=TRUE, warning=FALSE}
-model.comparison<-function(dta,preprocess_retention=retention){
+model.comparison.tree<-function(dta,preprocess_retention=retention){
 #Split training/test samples (0.7:0.3)
 train<-sample_frac(dta,size=0.7)
 test<-anti_join(dta,train,by="attomid")
@@ -612,12 +1012,116 @@ colnames(comparison)<-c("subsample",
                          "gb_5th")
 return(comparison)
 }
-a<-model.comparison(home_city_cleaned_dta$`AVE MARIA`%>%model.preprocess(
-                   price_high=5000000,
-                           price_low=100,
-                           start_year =2012,
-                           size=500))
+```
 
+```{r, echo=TRUE, warning=FALSE}
+model.comparison.regularization<-function(dta,preprocess_retention=retention){
+preprocess_retention<-retention
+#Split training/test samples (0.7:0.3)
+train<-sample_frac(dta,size=0.7)
+test<-anti_join(dta,train,by="attomid")
+#Prepare y and x features in train
+train<-train%>%select(-attomid,
+                  -situsstatecode,
+                  -situscounty,
+                  -propertyaddresscity)
+essential.var<-intersect(names(dta),c("deedlastsaledate",
+                       "yearbuilt",
+                       "areabuilding",
+                       "censustract"))%>%paste(collapse = "+")
+if ("deedlastsaledate"%in%names(dta)){
+  formula.1<-as.formula(paste("deedlastsaleprice~
+                   I(deedlastsaledate^5)+
+                  I(deedlastsaledate^4)+
+                  I(deedlastsaledate^3)+
+                  I(deedlastsaledate^2)+(",
+                  paste(essential.var),")^2+
+                    (.)"))
+}else{
+  formula.1<-as.formula(paste("deedlastsaleprice~(",paste(essential.var),")^2+(.)"))
+}
+train<-model.frame(formula.1,
+                 data = train,
+                 na.action = na.omit)
+y.train<-train$deedlastsaleprice
+x.train<-model.matrix(formula.1,
+                      data=train)
+#Prepare test
+test<-test%>%select(-attomid,
+                  -situsstatecode,
+                  -situscounty,
+                  -propertyaddresscity)
+test<-model.frame(formula.1,
+                 data = test,
+                 na.action = na.omit)
+y.test<-test$deedlastsaleprice
+x.test<-model.matrix(formula.1,
+                     data=test)
+#Predict with Ridge
+cv.out <- cv.glmnet(x.train,y.train, alpha = 0)
+bestlam <- cv.out$lambda.min
+out <- glmnet(x.train,y.train, nlambda = 1, lambda = bestlam, alpha = 0)
+yhat.ridge <- predict(cv.out, s = bestlam, newx <- x.test)
+ridge_MSE<-mean((yhat.ridge-y.test)^2,na.rm = TRUE)
+ridge_MPE<-mean((yhat.ridge-y.test)/y.test,na.rm = TRUE)
+ridge_MAPE<-mean(abs((yhat.ridge-y.test)/y.test),na.rm = TRUE)
+#Predict with LASSO
+cv.out <- cv.glmnet(x.train,y.train, alpha = 1)
+bestlam <- cv.out$lambda.min
+out <- glmnet(x.train,y.train, nlambda = 1, lambda = bestlam, alpha = 1)
+yhat.LASSO <- predict(cv.out, s = bestlam, newx <- x.test)
+LASSO_MSE<-mean((yhat.LASSO-y.test)^2,na.rm = TRUE)
+LASSO_MPE<-mean((yhat.LASSO-y.test)/y.test,na.rm = TRUE)
+LASSO_MAPE<-mean(abs((yhat.LASSO-y.test)/y.test),na.rm = TRUE)
+#Export important variables
+LASSO_coef<-coef(out)%>%row.names()%>%cbind(coef(out)%>%as.numeric())
+LASSO_coef<-LASSO_coef%>%as.data.frame()
+names(LASSO_coef)<-c("var","coef")
+LASSO_coef$coef<-LASSO_coef$coef%>%as.character()%>%as.numeric()
+LASSO_coef$var<-LASSO_coef$var%>%as.character()
+LASSO_coef$abs_coef<-abs(LASSO_coef$coef)
+LASSO_coef<-LASSO_coef[order(LASSO_coef$abs_coef,decreasing = TRUE),]
+LASSO_vars<-LASSO_coef$var[LASSO_coef$coef!=0&
+                   LASSO_coef$var!="(Intercept)"]
+LASSO_length<-LASSO_vars%>%length()
+LASSO_names<-LASSO_vars%>%paste(collapse = "  |  ")
+#Store comparison between Ridge and LASSO
+if (dta$propertyaddresscity%>%unique()%>%length()==1){
+  subsample_name<-paste(dta$situsstatecode%>%unique()%>%as.character()%>%paste(collapse ="_"),
+                      dta$situscounty%>%unique()%>%as.character()%>%paste(collapse ="_"),
+                      dta$propertyaddresscity%>%unique()%>%as.character()%>%paste(collapse ="_"),
+                      sep = "_")
+} else {
+  subsample_name<-paste(dta$situsstatecode%>%unique()%>%as.character()%>%paste(collapse ="_"),
+                        dta$situscounty%>%unique()%>%as.character()%>%paste(collapse ="_"))
+  
+}
+comparison<-c(subsample_name,
+              preprocess_retention,
+              nrow(dta),
+              ncol(dta),
+              ridge_MSE,
+              ridge_MPE,
+              ridge_MAPE,
+              LASSO_MSE,
+              LASSO_MPE,
+              LASSO_MAPE,
+              LASSO_length,
+              LASSO_names)%>%as.data.frame%>%t()
+colnames(comparison)<-c("subsample",
+                        "preprocess_retention",
+                        "obs",
+                        "vars",
+                        "ridge_MSE",
+                        "ridge_MPE",
+                        "ridge_MAPE",
+                        "LASSO_MSE",
+                        "LASSO_MPE",
+                        "LASSO_MAPE",
+                        "LASSO_length",
+                        "LASSO_names")
+return(comparison)
+}
 ```
 
 ---
@@ -626,10 +1130,11 @@ Assembling the final modeling function combining the previous 2 functions and ap
 ```{r, echo=TRUE, warning=FALSE}
 #Build function to parse modeling output and realize parameter entry
 modeling<-function(list,
+                   method="regularization",
                    price_h=5000000,
                            price_l=100,
                            yr_st=2012,
-                           sz=500){
+                           sz=1000){
 comparison_set<-NULL
 for (i in 1:length(list)){
   dta<-list[[i]]
@@ -638,7 +1143,12 @@ for (i in 1:length(list)){
                                      price_low = price_l,
                                      start_year = yr_st,
                                      size = sz)
-  comparison<-model.comparison(dta_preprocessed)
+  if (method=="tree"){
+    comparison<-model.comparison.tree(dta_preprocessed)
+  }
+  if (method=="regularization"){
+    comparison<-model.comparison.regularization(dta_preprocessed)
+  }
   comparison_set<-rbind(comparison_set,comparison)
 }
   comparison_set<-cbind(
@@ -651,59 +1161,97 @@ for (i in 1:length(list)){
   comparison_set<-comparison_set%>%as.data.frame()
   names(comparison_set)[1:4]<-c("price_high","price_low","year_start","size")
   comparison_set$preprocess_retention<-comparison_set$preprocess_retention%>%as.character()%>%as.numeric()
-  for (i in c("obs",
-              "vars",
-              "rf_MSE",
-              "rf_MPE",
-              "rf_MAPE",
-              "gb_MSE",
-              "gb_MPE",
-              "gb_MAPE")){
-    comparison_set[[i]]<-comparison_set[[i]]%>%as.character()%>%as.numeric()
-              }
+num_vars<-c("obs",
+            "vars",
+            "rf_MSE",
+            "rf_MAPE",
+            "gb_MSE",
+            "gb_MPE",
+            "gb_MAPE",
+            "ridge_MSE",
+            "ridge_MPE",
+            "ridge_MAPE",
+            "LASSO_MSE",
+            "LASSO_MPE",
+            "LASSO_MAPE",
+            "LASSO_length"
+            )
+  for (i in names(comparison_set)){
+    if (i%in%num_vars){
+        comparison_set[[i]]<-comparison_set[[i]]%>%as.character()%>%as.numeric()
+        }
+    }
   return(comparison_set)
 }
 ```
+
 ---
-## 7. Test between random forest and gradient boosting
+## 7. Test between 4 algorithms
 Test in subsample of cities and counties, compare several KPI of models to see which of random forest and gradient boosting does the job better.
-```{r, echo=TRUE, warning=FALSE}
-model_city<-modeling(home_city_cleaned_dta)
-model_county<-modeling(home_county_cleaned_dta)
+```{r, eval=FALSE, echo=TRUE, warning=FALSE}
+model_city_tree<-modeling(home_city_cleaned_dta,"tree",sz=300)
+model_city_regularization<-modeling(home_city_cleaned_dta,"regularization",sz=10000)
+model_summary<-inner_join(model_city_tree,
+                          model_city_regularization%>%select(subsample,
+                                                             ridge_MSE:LASSO_names))
+save(model_summary,file = "D:/Langyi/model_summary.RData")
 ```
 
 ---
-## 7. Test between random forest and gradient boosting
-Test in subsample of cities
+## 7.5 Visualize model performance
 ```{r, echo=TRUE, warning=FALSE}
-paste("In",
-    nrow(model_city),
-    "city-level subsamples,",
-    model_city[model_city$rf_MSE<model_city$gb_MSE,]%>%nrow(),
-    "generate better performance measure by MSE with random forest than boosting trees.",
-    model_city[model_city$rf_MPE<model_city$gb_MPE,]%>%nrow(),
-    "by MPE.",
-    model_city[model_city$rf_MAPE<model_city$gb_MAPE,]%>%nrow(),
-    "by MAPE."
-    )
-```
----
-## 7. Test between random forest and gradient boosting
-Test in subsample of counties
-```{r, echo=TRUE, warning=FALSE}
-paste("In",
-    nrow(model_county),
-    "county-level subsamples,",
-    model_county[model_county$rf_MSE<model_county$gb_MSE,]%>%nrow(),
-    "generate better performance measure by MSE with random forest than boosting trees.",
-    model_county[model_county$rf_MPE<model_county$gb_MPE,]%>%nrow(),
-    "by MPE.",
-    model_county[model_county$rf_MAPE<model_county$gb_MAPE,]%>%nrow(),
-    "by MAPE."
-    )
+load("D:/Langyi/citylevel_fullsample_tree_regularization.RData")
+city_stats<-home_dta%>%group_by(propertyaddresscity)%>%summarise(num=n(),
+                                                                 subsample=str_c(situsstatecode[1],
+                                                                                 situscounty[1],
+                                                                                      propertyaddresscity[1],
+                                                                                      sep ="_"),
+                                                price=median(deedlastsaleprice,na.rm=TRUE),
+                                                area=median(areabuilding,na.rm=TRUE),
+                                                averageprice=median(deedlastsaleprice/areabuilding,na.rm=TRUE),
+                                                builtyear=median(yearbuilt,na.rm=TRUE),
+                                                dist_coast=mean(dist_coast,na.rm=TRUE),
+                                                floodrisk=mean(mdkt32,na.rm=TRUE)
+                                                )
+major_models<-city_stats%>%inner_join(model_summary,by= "subsample")
+major_models$rf_MPE<-major_models$rf_MPE%>%as.character()%>%as.numeric()
+med_floodrisk1<-median(major_models$floodrisk,na.rm = TRUE)
+major_models$floodrisk1<-NA
+major_models$floodrisk1[major_models$floodrisk==0]<-"no flood risk"
+major_models$floodrisk1[major_models$floodrisk>0&
+                          major_models$floodrisk<=med_floodrisk1]<-"low flood risk"
+major_models$floodrisk1[major_models$floodrisk>med_floodrisk1]<-"high flood risk"
+#save(major_models,file = "D:/Langyi/graph_data/major_models.RData")
 ```
 
-The random forest outperforms boosting in most of the cases in cities/counties, across different measure of prediction accuracy. This is reasonable given our data is quite varying and is with a lot of correlated features, and the feature selection in random forest make the process more robust to different data.
+
+```{r, echo=TRUE, warning=FALSE}
+ggplot(major_models,
+       aes(x = price,
+           y = floodrisk,
+           color = floodrisk1,
+           size= num,
+           shape=rf_1st)) +
+  geom_point()+
+  geom_jitter()+
+  scale_color_brewer(palette = "OrRd",
+                     direction = -1)+
+  scale_x_continuous(name="Average property value ($)", 
+                     breaks=seq(0,2000000,by=200000))+
+  scale_y_continuous(name="Level of flood risk")+
+  geom_text(data=major_models[major_models$rf_MPE<0.3&
+                                major_models$floodrisk>0.03,],
+            aes(label=propertyaddresscity),
+            color="black",
+            size=2.5, hjust=-0.3, vjust=-0.3)+
+  ggtitle("Primary factor of property value in cities",
+          subtitle = "Cities with high flood risk and high prediction accuracy (within 30%) annotated")+
+  labs(caption = "Source: ATTOM Data Solutions")+
+  theme_classic()+
+  theme(axis.text.x=element_text(angle=30, hjust=1))
+```
+
+
 ---
 ## 8. Personalize filtering parameters for random forest
 Build plotting function. We want to see if we can control what data we put in, how to do so can help us get best results.
@@ -748,10 +1296,11 @@ grid.arrange(retention,mse,mape,mpe)
 ---
 ## 8. Personalize filtering parameters for random forest
 Error performance for maximum observation within each model. 
-```{r, eval=TRUE, echo=TRUE, warning=FALSE}
+```{r, eval=FALSE, echo=TRUE, warning=FALSE}
 error_matrix<-NULL
-for (i in seq(100,700,by=50)){
+for (i in seq(100,1000,by=100)){
 output<-modeling(home_county_cleaned_dta,
+                 method="tree",
                       price_h=5000000,
                       price_l=100,
                       sz=i,
@@ -770,7 +1319,7 @@ error_matrix<-error_matrix%>%as.data.frame()
 ---
 ## 8. Personalize filtering parameters for random forest
 This one looks at maximum size of sample in each model. Overall, a larger sample size does help to improve prediction. If not because of computation power constraint, a larger sample should've been used.
-```{r, echo=TRUE, warning=FALSE}
+```{r, eval=FALSE,echo=TRUE, warning=FALSE}
 error.plot(error_matrix)
 ```
 
@@ -778,13 +1327,14 @@ error.plot(error_matrix)
 ## 8. Personalize filtering parameters for random forest
 Error performance for lowest price acceptable for property
 
-```{r, echo=TRUE, warning=FALSE}
+```{r, eval=FALSE,echo=TRUE, warning=FALSE}
 error_matrix<-NULL
 for (i in c(100,200,300,500,700,1000,3000,5000,7000,10000)){
 output<-modeling(home_county_cleaned_dta,
+                 method="tree",
                       price_h=5000000,
                       price_l=i,
-                      sz=400, 
+                      sz=500, 
                       yr_st=2012)
 error_performance<-cbind(i,
                          output$preprocess_retention%>%mean(),
@@ -800,20 +1350,21 @@ error_matrix<-error_matrix%>%as.data.frame()
 ---
 ## 8. Personalize filtering parameters for random forest
 This one looks at lowest price acceptable for property. We can see there's a tradeoff between having better prediction and having less data.
-```{r, echo=TRUE, warning=FALSE}
+```{r, eval=FALSE,echo=TRUE, warning=FALSE}
 error.plot(error_matrix)
 ```
 
 ---
 ## 8. Personalize filtering parameters for random forest
 Error performance for starting year to filter the properties
-```{r, echo=TRUE, warning=FALSE}
+```{r, eval=FALSE,echo=TRUE, warning=FALSE}
 error_matrix<-NULL
 for (i in c(2000,2004,2007,2010,2012,2014,2015,2016,2017)){
 output<-modeling(home_county_cleaned_dta,
+                 method="tree",
                       price_h=5000000,
                       price_l=100,
-                      sz=400, 
+                      sz=500, 
                       yr_st=i)
 error_performance<-cbind(i,
                          output$preprocess_retention%>%mean(),
@@ -829,19 +1380,20 @@ error_matrix<-error_matrix%>%as.data.frame()
 ---
 ## 8. Personalize filtering parameters for random forest
 This one looks at starting year to filter the properties. It seems constraining to certain recent year may help, but we want to further figure out what's its impact on the sample size.
-```{r, echo=TRUE, warning=FALSE}
+```{r,eval=FALSE, echo=TRUE, warning=FALSE}
 error.plot(error_matrix)
 ```
 ---
 ## 8. Personalize filtering parameters for random forest
 Error performance for highest price acceptable for properties. 
-```{r, echo=TRUE, warning=FALSE}
+```{r, eval=FALSE,echo=TRUE, warning=FALSE}
 error_matrix<-NULL
 for (i in c(100000,300000,500000,700000,1000000,3000000,5000000,7000000,10000000)){
 output<-modeling(home_county_cleaned_dta,
+                 method="tree",
                       price_h=i,
                       price_l=100,
-                      sz=400, 
+                      sz=500, 
                       yr_st=2012)
 error_performance<-cbind(i,
                          output$preprocess_retention%>%mean(),
@@ -858,39 +1410,10 @@ error_matrix<-error_matrix%>%as.data.frame()
 ---
 ## 8. Personalize filtering parameters for random forest
 This one looks at highest price acceptable for properties It seems 
-```{r, echo=TRUE, warning=FALSE}
+```{r, eval=FALSE,echo=TRUE, warning=FALSE}
 error.plot(error_matrix)
 ```
----
-## 9. Iteration through cities/counties and view corss-validated model performance
-Cities (I have to fix data table to ensure data confidentiality)
-```{r, echo=TRUE, warning=FALSE}
-library(knitr)
-rf_set_city<-modeling(home_city_cleaned_dta)%>%select(price_high:rf_5th)
-rf_set_city[order(rf_set_city$rf_MAPE),]%>%data.table()
-```
 
-Counties
-```{r, echo=TRUE, warning=FALSE}
-rf_set_county<-modeling(home_county_cleaned_dta)%>%select(price_high:rf_5th)
-rf_set_county[order(rf_set_county$rf_MAPE),]%>%data.table()
-```
----
-## 10. Map county-level model performance
-We want to see how each county performs on the map.
-```{r, echo=TRUE, warning=FALSE}
-#merge model performance data by county to parcel file
-rf_set_county1<-rf_set_county
-rf_set_county1$subsample<-rf_set_county1$subsample%>%str_sub(start = 4L)
-names(rf_set_county1)[5]<-"NAME"
-parcel@data<-inner_join(parcel@data,rf_set_county1,by="NAME")
-```
----
-## 10. Map county-level model performance
-Different measure and attributed displayed in the map
-```{r, echo=TRUE, warning=FALSE}
-tmap_arrange(summary.county(varname="preprocess_retention"),summary.county(varname="obs"),summary.county(varname="vars"),summary.county(varname="rf_MSE"),summary.county(varname="rf_MPE"),summary.county(varname="rf_MAPE"),summary.county(varname="rf_1st"),summary.county(varname="rf_2nd"),summary.county(varname="rf_3rd"),ncol=3)
-```
 ---
 ## 10. Map county-level model performance
 If we recall previous exploratory analysis, the county's performance relies quite some on the features of each individual county. For some counties which lack a considerable number of important attributes, the prediction power is small. This sugggests it's correct to model by county to avoid the data quality issue of some counties will spread to the whole sample, but how to improve the low data quality prediction can be a subsequent challenge.
@@ -911,14 +1434,17 @@ Transaction time and building area is 2 primary factor to determine property val
 Many subsample's performance yet to be improved
 
 ---
-## 12. next step
-Time is an important variable. Could try model 5th order polynomial on it then feed estimates back to the model to control for time effect
-
-Try ridge/LASSO with all interaction and feature selection (especially census tract and time, also can include ZIP code as variable)
-
-Recode NA and keep the positive response to increase completeness of data
+## 12. Next step
+add tract block medium price as control
 
 Can try tuning the filtering parameter for each model
+
+chunk: overflow-y
+
+xgboost
+log scale price
+recode zip code to dummy (one-hot recoding)
+cities can use superzip as example
 
 ---
 ## Thank you for taking time to check the slides.

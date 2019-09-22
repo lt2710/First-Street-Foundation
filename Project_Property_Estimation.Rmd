@@ -301,11 +301,11 @@ drop.unary<-function(dta){
 
 ```{r, echo=TRUE, warning=FALSE}
 #Apply to city the function in previous function for feature selection
-home_city_cleaned_dta<-map(home_city_dta,drop.missing)
-home_city_cleaned_dta<-map(home_city_cleaned_dta,drop.unary)
+home_city_cleaned_dta<-purrr::map(home_city_dta,drop.missing)
+home_city_cleaned_dta<-purrr::map(home_city_cleaned_dta,drop.unary)
 #Apply to county the function in previous function for feature selection
-home_county_cleaned_dta<-map(home_county_dta,drop.missing)
-home_county_cleaned_dta<-map(home_county_cleaned_dta,drop.unary)
+home_county_cleaned_dta<-purrr::map(home_county_dta,drop.missing)
+home_county_cleaned_dta<-purrr::map(home_county_cleaned_dta,drop.unary)
 ```
 
 ```{r, echo=TRUE, warning=FALSE}
