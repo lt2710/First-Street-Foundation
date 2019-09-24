@@ -59,6 +59,7 @@ knitr::opts_chunk$set(
   cache = TRUE,
   cache.lazy = FALSE
 )
+knitr::opts_knit$set(root.dir = "C:\\Users\\Tianl\\Documents\\GitHub\\First-Street-Foundation")
 options(htmltools.dir.version = FALSE)
 ```  
 
@@ -143,105 +144,123 @@ Data Science Solution: Quantify the impact by calculating financial loss
 
 ## 1. Data preparation
 Select relevant features from raw data, which comes from a real estate broker's data base. Observations are properties and variables are relevant attributes.
-```{r}
+```{r, eval=FALSE}
 #Input original dataset 1: property data
-home_dta_original<-fread("D:/raw_data/SF_Home_Characteristics.csv")
+home_dta_original<-fread("raw_data/SF_Home_Characteristics.csv")
+save(home_dta_original, file = "dta_processed/SF_Taxassessor_original.RData")
+```
+
+```{r, eval=FALSE}
 #Select features to import, subset and save
-home_dta<-select(home_dta_original,
-                 attomid,#Matching ID
-                 deedlastsaleprice,#Transaction price last sale
-                 situsstatecode,#State code
-                 situscounty,#County code
-                 propertyaddresscity,#City code
-                 ownertypedescription1,#First owner is individual/company?
-                 ownertypedescription2,#Second owner is individual/company?
-                 deedlastsaledate,#Date of market sale
-                 yearbuilt,#Year when built
-                 propertyusegroup,#Commercial/residential?
-                 areabuilding,#Living area in sq.feet
-                 censustract,#Census tract division
-                 propertylatitude,#Lat of property
-                 propertylongitude,#Lon of property
-                 roomsatticflag,#See below
-                 parkinggarage:communityrecroomflag#A series variable measuring physical attributes of the property, including rooms count and relevant facilities
-                 )
-save(home_dta,file = "D:/Langyi/Taxassessor_reduced.RData")
+home_dta <- select(
+  home_dta_original,
+  attomid,
+  #Matching ID
+  deedlastsaleprice,
+  #Transaction price last sale
+  situsstatecode,
+  #State code
+  situscounty,
+  #County code
+  propertyaddresscity,
+  #City code
+  ownertypedescription1,
+  #First owner is individual/company?
+  ownertypedescription2,
+  #Second owner is individual/company?
+  deedlastsaledate,
+  #Date of market sale
+  yearbuilt,
+  #Year when built
+  propertyusegroup,
+  #Commercial/residential?
+  areabuilding,
+  #Living area in sq.feet
+  censustract,
+  #Census tract division
+  propertylatitude,
+  #Lat of property
+  propertylongitude,
+  #Lon of property
+  roomsatticflag,
+  #See below
+  parkinggarage:communityrecroomflag#A series variable measuring physical attributes of the property, including rooms count and relevant facilities
+)
+save(home_dta, file = "dta_processed/SF_Taxassessor_reduced.RData")
 ```
 
-```{r, eval=FALSE,echo=FALSE, warning=FALSE}
+```{r, eval=FALSE}
 #Import dataset 2: property and environmental risk, subset and save
-risk_dta_original<-fread("D:/raw_data/SF_Parcel_Risk_and_Spatial_Data.csv")
-risk_dta<-risk_dta_original%>%select(attomid=ATTOM_ID,
-                                     dist_coast,
-                                     mdkt32,
-                                     Totpopbg:near_reading_rates,
-                                     )
-save(risk_dta,file = "D:/Langyi/SF_Parcel_Risk_and_Spatial_Data_reduced.RData")
+risk_dta_original <-
+  fread("raw_data/SF_Parcel_Risk_and_Spatial_Data.csv")
+save(risk_dta_original, file = "dta_processed/SF_Parcel_Risk_and_Spatial_Data_original.RData")
+risk_dta <- risk_dta_original %>% select(attomid = ATTOM_ID,
+                                         dist_coast,
+                                         mdkt32,
+                                         Totpopbg:near_reading_rates,)
+save(risk_dta, file = "dta_processed/SF_Parcel_Risk_and_Spatial_Data_reduced.RData")
 ```
 
-```{r, eval=FALSE, echo=FALSE, warning=FALSE}
+```{r, eval=FALSE}
 #Import dataset 3: property transactions, subset and save
-trans_dta_original<-fread("D:/raw_data/SF_Sales_Transactions_Data.csv")
-trans_dta<-trans_dta_original%>%group_by(attomid)%>%summarize(trans_times=n())
-save(trans_dta,file = "D:/Langyi/SF_Sales_Transactions_Data_reduced.RData")
+trans_dta_original <-
+  fread("raw_data/SF_Sales_Transactions_Data.csv")
+save(trans_dta_original, file = "dta_processed/SF_Sales_Transactions_Data_original.RData")
+trans_dta <-
+  trans_dta_original %>% group_by(attomid) %>% summarize(trans_times = n())
+save(trans_dta, file = "dta_processed/SF_Sales_Transactions_Data_reduced.RData")
 ```
 
-```{r, echo=FALSE, warning=FALSE}
-#Load saved RData
-load("D:/Langyi/Taxassessor_reduced.RData")
-load("D:/Langyi/SF_Parcel_Risk_and_Spatial_Data_reduced.RData")
-home_dta<-left_join(home_dta,risk_dta,by="attomid")
-load("D:/Langyi/SF_Sales_Transactions_Data_reduced.RData")
-home_dta<-left_join(home_dta,trans_dta,by="attomid")
+```{r}
+#Load and join saved RData
+load("dta_processed/SF_Taxassessor_reduced.RData")
+load("dta_processed/SF_Parcel_Risk_and_Spatial_Data_reduced.RData")
+home_dta <- left_join(home_dta, risk_dta, by = "attomid")
+load("dta_processed/SF_Sales_Transactions_Data_reduced.RData")
+home_dta <- left_join(home_dta, trans_dta, by = "attomid")
 ```
 
-```{r, echo=FALSE, warning=FALSE}
+```{r}
 #Store (and report) a current version of data here
-report.dim<-function(dta){
+report.dim <- function(dta) {
   cat("Up to here, the data dimension is",
-    dim(dta)[1],
-    "*",
-    dim(dta)[2]
-    )
+      dim(dta)[1],
+      "*",
+      dim(dta)[2])
 }
-home_dta_ver1<-home_dta
-home_dta_ver1%>%report.dim()
+home_dta_ver1 <- home_dta
+home_dta_ver1 %>% report.dim()
 ```
 
 ---
 ## 1. Data preparation
 Recoding and transforming features, mostly to kick out less meaningful factor levels and values miscoded
-```{r, echo=TRUE, warning=FALSE}
+```{r}
 #This chunk of recoding is not supposed to change data dimension
 #Fill in the price variable so that it will not be dropped later
-home_dta$deedlastsaleprice[is.na(home_dta$deedlastsaleprice)=="TRUE"]<-0
+home_dta$deedlastsaleprice[is.na(home_dta$deedlastsaleprice) == "TRUE"] <- 0
 #Rounding deed last sale date to year and recoding NAs
-home_dta$deedlastsaledate<-str_sub(home_dta$deedlastsaledate,start = 0,end = 4)%>%
+home_dta$deedlastsaledate <-
+  str_sub(home_dta$deedlastsaledate, start = 0, end = 4) %>%
   as.numeric()
-home_dta$deedlastsaledate[home_dta$deedlastsaledate==""]<-NA
+home_dta$deedlastsaledate[home_dta$deedlastsaledate == ""] <- NA
 #Make id numeric
-home_dta$attomid<-home_dta$attomid%>%as.numeric()
+home_dta$attomid <- home_dta$attomid %>% as.numeric()
 #Recoding ownership type misseallenous to NA
-home_dta$ownertypedescription1[home_dta$ownertypedescription1=="NP"|
-                                 home_dta$ownertypedescription1=="UNKNOWN"|
-                                 home_dta$ownertypedescription1==""|
-                                 is.na(home_dta$ownertypedescription1)==TRUE]<-0
-home_dta$ownertypedescription2[home_dta$ownertypedescription2=="NP"|
-                                 home_dta$ownertypedescription2=="UNKNOWN"|
-                                 home_dta$ownertypedescription2==""|
-                                 is.na(home_dta$ownertypedescription2)==TRUE]<-0
+home_dta$ownertypedescription1[home_dta$ownertypedescription1 %in% c ("NP", "UNKNOWN", "") |
+                                 is.na(home_dta$ownertypedescription1) == TRUE] <- 0
+home_dta$ownertypedescription2[home_dta$ownertypedescription2 %in% c ("NP", "UNKNOWN", "") |
+                                 is.na(home_dta$ownertypedescription2) == TRUE] <- 0
 ```
 
 ---
 ## 1. Data preparation
 Recoding and transforming features (cont'd)
-```{r, echo=TRUE, warning=FALSE}
+```{r}
 #Recoding property usage group
-home_dta$propertyusegroup[home_dta$propertyusegroup=="UNKNOWN"|
-                            home_dta$propertyusegroup=="Other"|
-                            home_dta$propertyusegroup=="NP"|
-                            is.na(home_dta$propertyusegroup)==TRUE]<-0
-#Note that 152 PropertyUseStandardized is better coded by, should do this in future
+home_dta$propertyusegroup[home_dta$propertyusegroup%in% c ("NP", "UNKNOWN", "") |
+                                 is.na(home_dta$propertyusegroup) == TRUE] <- 0
+#152 PropertyUseStandardized is better coded, should do this in future
 #class_coding<-read.csv("D:/raw_data/prop_use_codes_trim.csv")
 #Excluding <50 sq. feet living area
 home_dta$areabuilding[home_dta$areabuilding<50]<-NA
@@ -249,70 +268,66 @@ home_dta$areabuilding[home_dta$areabuilding<50]<-NA
 
 ---
 ## 1. Data preparation
-Drop unary features at aggregated level
-```{r, echo=TRUE, warning=FALSE}
+Drop all unary features
+```{r}
 #Drop unary variables in dataset
-drop.unary<-function(dta){
-  for (i in names(dta)[-1:-14]){
-    var<-dta[[i]]
-    var<-var[is.na(var)==FALSE]
-    if ((var%>%unique()%>%length()==1)|
-        (var%>%unique()%>%length()==0)){
-    dta<-dta%>%select(-i)
+drop.unary <- function(dta) {
+  for (i in names(dta)[-1:-which(names(home_dta)=="propertylongitude")]) {
+    var <- dta[[i]]
+    var <- var[is.na(var) == FALSE]
+    if ((var %>% unique() %>% length() %in% c(0, 1))) {
+      dta <- dta %>% select(-i)
     }
   }
   return(dta)
 }
-home_dta<-home_dta%>%drop.unary()
-home_dta_ver1.5<-home_dta
-home_dta_ver1.5%>%report.dim()
+home_dta <- home_dta %>% drop.unary()
+home_dta_ver1.5 <- home_dta
+home_dta_ver1.5 %>% report.dim()
 ```
 
 ---
 ##1. Data preparation
 Recoding and transforming features (cont'd)
-```{r, echo=TRUE, warning=FALSE}
+```{r}
 #Drop variables with too many levels, besides those are numerical
-screen_names<-home_dta%>%select()
-for (i in names(home_dta)[-44:-91]){
-  if (i>14){
-    if ((home_dta[[i]]%>%unique()%>%length()>10)&
-        (str_detect(i,pattern = "area")==FALSE)&
-        (str_detect(i,pattern = "count")==FALSE)&
-        (!i%in%c("dist_coast","mdkt32","trans_times"))
-        ){
+for (i in names(home_dta)[which(names(home_dta) == "parkinggarage"):which(names(home_dta) ==
+                                                                          "mdkt32")]) {
+  if ((home_dta[[i]] %>% unique() %>% length() > 10) &
+      (str_detect(i, pattern = "area") == FALSE) &
+      (str_detect(i, pattern = "count") == FALSE) &
+      (!i %in% c("dist_coast", "mdkt32", "trans_times"))) {
     print(i)
-    home_dta<-home_dta%>%select(-i)
-    }
+    home_dta <- home_dta %>% select(-i)
   }
 }
 #Store a stage version of data here
-home_dta_ver2<-home_dta
-home_dta_ver2%>%report.dim()
+home_dta_ver2 <- home_dta
+home_dta_ver2 %>% report.dim()
 ```
 
 ---
 ##1. Data preparation
 Recoding and transforming features (cont'd)
-```{r, echo=TRUE, warning=FALSE}
+```{r}
 #Give value 0 for NAs in less improtant variables so the obs will not be deleted
-for (i in names(home_dta)[-1:-14]){
-    home_dta[[i]][is.na(home_dta[[i]])==TRUE|
-                    home_dta[[i]]==""|
-                    home_dta[[i]]=="NA"]<-0
+for (i in names(home_dta)[-1:-14]) {
+  home_dta[[i]][is.na(home_dta[[i]]) == TRUE |
+                  home_dta[[i]] == "" |
+                  home_dta[[i]] == "NA"] <- 0
 }
 ```
 
 ---
 ## 1. Data preparation
 Recoding and transforming features (cont'd)
-```{r, echo=TRUE, warning=FALSE}
+```{r}
 #Recoded characters to factors.
 cat("These variables are recoded to factors")
-for (i in names(home_dta)){
-  if (class(home_dta[[i]])=="character"){
+for (i in names(home_dta)) {
+  if (class(home_dta[[i]]) == "character") {
     print(i)
-    home_dta[[i]]<-home_dta[[i]]%>%as.factor()
+    home_dta[[i]] <- home_dta[[i]] %>% as.factor()
   }
 }
 ```
@@ -320,271 +335,269 @@ for (i in names(home_dta)){
 ---
 
 ## 1. Data preparation
-```{r, echo=TRUE, warning=FALSE}
+```{r}
 #Get a list of large cities sufficient for consideration
-city_obs<-group_by(home_dta,propertyaddresscity)%>%summarise(n())
-names(city_obs)[1]<-"City"
-names(city_obs)[2]<-"Properties"
-city_obs<-city_obs%>%filter(city_obs$Properties<20000)
+city_obs <-
+  group_by(home_dta, propertyaddresscity) %>% summarise(n())
+names(city_obs) <- c("propertyaddresscity", "Properties")
 ```
 
 ---
 ## 1. Data preparation
-Drop cities with sample size too small to go into tree model.
-```{r, echo=TRUE, warning=FALSE}
+Hold out cities with sample size too small to go into tree model.
+```{r}
 #For obtaining sufficient number of obs in each model, we drop cities with <5000 obs.
-city_obs<-city_obs[-1,]
-city_obs<-city_obs%>%filter(city_obs$Properties>1000)%>%as.data.frame()
-city_obs$Properties<-NULL
-names(city_obs)[1]<-"propertyaddresscity"
-home_dta_less_city<-home_dta%>%inner_join(city_obs,key = "prepertyaddresscity")
-home_dta<-home_dta_less_city
+city_obs <- city_obs %>% filter(propertyaddresscity != "",
+                                city_obs$Properties > 1000)
+home_dta_less_city <-
+  home_dta %>% filter(home_dta$propertyaddresscity %in% city_obs$propertyaddresscity)
+home_dta <- home_dta_less_city
 #Store a stage version of data here
-home_dta_ver3<-home_dta_less_city
-home_dta_ver3%>%report.dim()
+home_dta_ver3 <- home_dta_less_city
+home_dta_ver3 %>% report.dim()
 ```
 
 ---
 ## 2. Exploratory analysis
 Plot summary graph of a few important variables to understand their overall statistical distribution
-```{r, echo=TRUE, warning=FALSE}
+```{r}
 #Plot summary of a few important variables
-summary.variable<-function(varname="deedlastsaleprice",
-                        dta=home_dta){
-  #For numeric variables
-  if (class(dta[[varname]])=="numeric"){
-    m<-ggplot(data=dta)+
-  geom_area(aes(x = dta[[varname]]),
-                 stat = "bin",
-            fill = "khaki2"
-           )+
-  xlab(paste(varname,class(dta[[varname]])))+
-  ylab("Properties")+
-  theme_classic()+
-  theme(axis.text.x=element_text(angle=30, hjust=1))
+summary.variable <- function(varname = "deedlastsaleprice",
+                             dta = home_dta) {
+  #For numeric and integer variables
+  if (class(dta[[varname]]) %in% c("numeric", "integer")) {
+    m <- ggplot(data = dta) +
+      geom_area(aes(x = dta[[varname]]),
+                stat = "bin",
+                fill = "khaki2") +
+      xlab(paste(varname, class(dta[[varname]]))) +
+      ylab("Properties") +
+      theme_classic() +
+      theme(axis.text.x = element_text(angle = 30, hjust = 1))
   }
-  #For integers
-  if (class(dta[[varname]])=="integer"){
-    m<-ggplot(data=dta)+
-  geom_area(aes(x = dta[[varname]]),
-                 stat = "bin",
-            fill = "khaki2"
-           )+
-  xlab(paste(varname,class(dta[[varname]])))+
-  ylab("Properties")+
-  theme_classic()+
-  theme(axis.text.x=element_text(angle=30, hjust=1))
-  }
-  #For factors
-  if (class(dta[[varname]])=="factor"){
-    m<-ggplot(data=dta)+
-  geom_bar(aes(x = dta[[varname]]),
-            fill = "khaki2"
-           )+
-  xlab(paste(varname,class(dta[[varname]])))+
-  ylab("Properties")+
-  theme_classic()+
-  theme(axis.text.x=element_text(angle=30, hjust=1))
-  }
-  #For logicals
-  if (class(dta[[varname]])=="logical"){
-    m<-ggplot(data=dta)+
-  geom_bar(aes(x = dta[[varname]]),
-            fill = "khaki2"
-           )+
-  xlab(paste(varname,class(dta[[varname]])))+
-  ylab("Properties")+
-  theme_classic()+
-  theme(axis.text.x=element_text(angle=30, hjust=1))
+  #For factors and logicals
+  if (class(dta[[varname]]) %in% c("factor", "logical")) {
+    m <- ggplot(data = dta) +
+      geom_bar(aes(x = dta[[varname]]),
+               fill = "khaki2") +
+      xlab(paste(varname, class(dta[[varname]]))) +
+      ylab("Properties") +
+      theme_classic() +
+      theme(axis.text.x = element_text(angle = 30, hjust = 1))
   }
   return(m)
 }
 ```
 
 
-```{r, echo=TRUE, warning=FALSE}
-var_plots<-lapply(colnames(home_dta), summary.variable)
-grid_plot<-function(start_num=1){
-grid.arrange(var_plots[[start_num]],
-                var_plots[[start_num+1]],
-                var_plots[[start_num+2]],
-                var_plots[[start_num+3]],
-                var_plots[[start_num+4]],
-                var_plots[[start_num+5]],
-                var_plots[[start_num+6]],
-                var_plots[[start_num+7]],
-                var_plots[[start_num+8]],
-             var_plots[[start_num+9]],
-             var_plots[[start_num+10]],
-             var_plots[[start_num+11]],
-             var_plots[[start_num+12]],
-             var_plots[[start_num+13]],
-             var_plots[[start_num+14]],
-             var_plots[[start_num+15]],
-             var_plots[[start_num+16]],
-             var_plots[[start_num+17]],
-             var_plots[[start_num+18]],
-             var_plots[[start_num+19]]
-             ) 
+```{r}
+var_plots <- lapply(colnames(home_dta), summary.variable)
+grid_plot <- function(start_num = 1) {
+  grid.arrange(
+    var_plots[[start_num]],
+    var_plots[[start_num + 1]],
+    var_plots[[start_num + 2]],
+    var_plots[[start_num + 3]],
+    var_plots[[start_num + 4]],
+    var_plots[[start_num + 5]],
+    var_plots[[start_num + 6]],
+    var_plots[[start_num + 7]],
+    var_plots[[start_num + 8]],
+    var_plots[[start_num + 9]],
+    var_plots[[start_num + 10]],
+    var_plots[[start_num + 11]],
+    var_plots[[start_num + 12]],
+    var_plots[[start_num + 13]],
+    var_plots[[start_num + 14]],
+    var_plots[[start_num + 15]],
+    var_plots[[start_num + 16]],
+    var_plots[[start_num + 17]],
+    var_plots[[start_num + 18]],
+    var_plots[[start_num + 19]]
+  )
 }
 ```
 
-```{r, eval=FALSE, echo=TRUE, warning=FALSE}
+```{r, eval=FALSE}
 grid_plot(1)
 ```
 
 ---
 ## 2. Exploratory analysis
 Summarize a few key variables by county to see the geographical variation
-```{r,warning=FALSE,message=FALSE,echo=TRUE}
+```{r}
 #Import shape file and save to rdata to reduce loading time
-library(rgdal)
-parcel<-readOGR(dsn = "D:/Langyi/tl_2017_us_county", layer = "tl_2017_us_county")
-counties<-c("Broward","Collier","Hendry","Lee","Miami-Dade","Monroe","Palm Beach")
-parcel<-parcel[parcel@data$NAME%in%counties&parcel@data$STATEFP=="12",]
+parcel <-
+  readOGR(dsn = "raw_data/tl_2017_us_county", layer = "tl_2017_us_county")
+counties <-
+  c("Broward",
+    "Collier",
+    "Hendry",
+    "Lee",
+    "Miami-Dade",
+    "Monroe",
+    "Palm Beach")
+parcel <-
+  parcel[parcel@data$NAME %in% counties & parcel@data$STATEFP == "12", ]
 #Summary a few key variables by county
-county_summary<-home_dta%>%group_by(situscounty)%>%summarize(n()%>%as.numeric(),
-                                                    mean(deedlastsaleprice%>%as.numeric(),na.rm = TRUE),
-                                             mean(yearbuilt%>%as.numeric(),na.rm = TRUE),
-                                          mean(areabuilding%>%as.numeric(),na.rm = TRUE))
-names(county_summary)<-c("NAME",
-                         "Number_of_Properties",
-                         "Average_Price","Average_Built_Year",
-                         "Average_Living_Area")
-parcel@data<-inner_join(parcel@data,county_summary,by="NAME")
-#save(parcel,file = "D:/Langyi/graph_data/parcel.RData")
+county_summary <-
+  home_dta %>% group_by(situscounty) %>% summarize(
+    Number_of_Properties = n() %>% as.numeric(),
+    Average_Price = mean(deedlastsaleprice %>%
+                           as.numeric(), na.rm = TRUE),
+    Average_Built_Year = mean(yearbuilt %>%
+                                as.numeric(), na.rm = TRUE),
+    Average_Living_Area = mean(areabuilding %>%
+                                 as.numeric(), na.rm = TRUE)
+  )
+names(county_summary)[1] <- c("NAME")
+parcel@data <- inner_join(parcel@data, county_summary, by = "NAME")
+save(parcel, file = "graph_data/parcel.RData")
 ```
 
 ---
 ## 2. Exploratory analysis
-```{r,warning=FALSE,message=FALSE,echo=TRUE}
+```{r}
 #Plot statistics by county
 options(scipen = 10)
-library(tmap)
-summary.county<-function(varname,par=parcel){
-m<-tm_shape(parcel) + 
-  tm_fill(varname,
-          palette = "GnBu")+
-  tm_text("NAME",size = 0.6)+
-  tm_borders(col = "black")+
-  tm_layout(
-  legend.title.size=0.8,
-  legend.text.size = 0.5,
-  legend.position = c("left","top"),
-  legend.bg.color = "white",
-  legend.bg.alpha = 0)
-return(m)
+summary.county <- function(varname, par = parcel) {
+  m <- tm_shape(parcel) +
+    tm_fill(varname,
+            palette = "GnBu") +
+    tm_text("NAME", size = 0.6) +
+    tm_borders(col = "black") +
+    tm_layout(
+      legend.title.size = 0.8,
+      legend.text.size = 0.5,
+      legend.position = c("left", "top"),
+      legend.bg.color = "white",
+      legend.bg.alpha = 0
+    )
+  return(m)
 }
-tmap_arrange(summary.county(varname="Number_of_Properties"),
-             summary.county(varname="Average_Price"),
-             summary.county(varname="Average_Living_Area"),
-             summary.county(varname="Average_Built_Year"),
-             nrow = 2)
+tmap_arrange(
+  summary.county(varname = "Number_of_Properties"),
+  summary.county(varname = "Average_Price"),
+  summary.county(varname = "Average_Living_Area"),
+  summary.county(varname = "Average_Built_Year"),
+  nrow = 2
+)
 ```
 
 ---
 ## 2. Exploratory analysis
-```{r, echo=TRUE, warning=FALSE}
-by_year_county<-home_dta%>%group_by(situscounty,deedlastsaledate)%>%summarize(num=n(),
-                                                                                           price=median(deedlastsaleprice,na.rm=TRUE),
-                                                  area=mean(areabuilding,na.rm=TRUE),
-                                              averageprice=mean(deedlastsaleprice/areabuilding,na.rm=TRUE),
-                                                  builtyear=mean(yearbuilt,na.rm=TRUE))
-#save(by_year_county,file = "D:/Langyi/graph_data/by_year_county.RData")
+```{r}
+by_year_county <-
+  home_dta %>% group_by(situscounty, deedlastsaledate) %>% summarize(
+    num = n(),
+    price =
+      median(deedlastsaleprice, na.rm = TRUE),
+    area = mean(areabuilding, na.rm =
+                  TRUE),
+    averageprice = mean(deedlastsaleprice /
+                          areabuilding, na.rm = TRUE),
+    builtyear = mean(yearbuilt, na.rm =
+                       TRUE)
+  )
+#save(by_year_county,file = "graph_data/by_year_county.RData")
 ```
 
 ---
 ## 2. Exploratory analysis
-```{r, echo=TRUE, warning=FALSE}
-ggplot(by_year_county[by_year_county$deedlastsaledate>1955&
-                 by_year_county$deedlastsaledate<2019&
-                 is.na(by_year_county$deedlastsaledate)==FALSE&
-                 is.na(by_year_county$county)==FALSE,],
+```{r}
+ggplot(by_year_county[by_year_county$deedlastsaledate > 1955 &
+                        by_year_county$deedlastsaledate < 2019 &
+                        is.na(by_year_county$deedlastsaledate) == FALSE &
+                        is.na(by_year_county$county) == FALSE, ],
        aes(x = deedlastsaledate,
            y = price,
            color = situscounty)) +
-  scale_color_brewer(palette = "Set3")+
-  geom_line(data=by_year_county[by_year_county$deedlastsaledate>1955&
-                           by_year_county$deedlastsaledate<2019,])+
-  geom_point(data=by_year_county[by_year_county$deedlastsaledate>1955&
-                           by_year_county$deedlastsaledate<2019,])+
-  scale_x_continuous(name="Year of transaction", 
-                     breaks=c(seq(1955,2018,by=5),2018))+
-  scale_y_continuous(name="Average transaction price ($)", 
-                     breaks=seq(0,2000000,by=200000))+
-  ggtitle("Historical transaction price in each county")+
-  labs(caption = "Source: ATTOM Data Solutions")+
-  theme_classic()+
-  theme(axis.text.x=element_text(angle=30, hjust=1))
+  scale_color_brewer(palette = "Set3") +
+  geom_line(data = by_year_county[by_year_county$deedlastsaledate > 1955 &
+                                    by_year_county$deedlastsaledate < 2019, ]) +
+  geom_point(data = by_year_county[by_year_county$deedlastsaledate > 1955 &
+                                     by_year_county$deedlastsaledate < 2019, ]) +
+  scale_x_continuous(name = "Year of transaction",
+                     breaks = c(seq(1955, 2018, by = 5), 2018)) +
+  scale_y_continuous(name = "Average transaction price ($)",
+                     breaks = seq(0, 2000000, by = 200000)) +
+  ggtitle("Historical transaction price in each county") +
+  labs(caption = "Source: ATTOM Data Solutions") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
 ```
 
 add transaction num by year
 
 ---
 ## 2. Exploratory analysis
-```{r, echo=TRUE, warning=FALSE}
-by_year_use<-home_dta[home_dta$propertyusegroup!=0,]%>%group_by(propertyusegroup,deedlastsaledate)%>%summarize(num=n(),
-                                                                                           price=median(deedlastsaleprice,na.rm=TRUE),
-                                                  area=mean(areabuilding,na.rm=TRUE),
-                                              averageprice=mean(deedlastsaleprice/areabuilding,na.rm=TRUE),
-                                                  builtyear=mean(yearbuilt,na.rm=TRUE)
-                                                  )
+```{r}
+by_year_use <-
+  home_dta[home_dta$propertyusegroup != 0, ] %>% group_by(propertyusegroup, deedlastsaledate) %>%
+  summarize(
+    num = n(),
+    price =
+      median(deedlastsaleprice, na.rm = TRUE),
+    area = mean(areabuilding, na.rm =
+                  TRUE),
+    averageprice = mean(deedlastsaleprice /
+                          areabuilding, na.rm = TRUE),
+    builtyear = mean(yearbuilt, na.rm =
+                       TRUE)
+  )
 #save(by_year_use,file = "D:/Langyi/graph_data/by_year_use.RData")
 ```
 
 ---
 ## 2. Exploratory analysis
-```{r, echo=TRUE, warning=FALSE}
-ggplot(by_year_use[by_year_use$deedlastsaledate>1955&
-                 by_year_use$deedlastsaledate<2019&
-                 is.na(by_year_use$deedlastsaledate)==FALSE&
-                 is.na(by_year_use$county)==FALSE,],
+```{r}
+ggplot(by_year_use%>%filter(deedlastsaledate %in%c(1955:2019)),
        aes(x = deedlastsaledate,
            y = price,
            color = propertyusegroup)) +
-  scale_color_brewer(palette = "Dark2")+
-  geom_line(data=by_year_use[by_year_use$deedlastsaledate>1955&
-                           by_year_use$deedlastsaledate<2019,])+
-  geom_point(data=by_year_use[by_year_use$deedlastsaledate>1955&
-                           by_year_use$deedlastsaledate<2019,])+
-  scale_x_continuous(name="Transaction year", 
-                     breaks=c(seq(1955,2018,by=5),2018))+
-  scale_y_continuous(name="Average property value ($)", 
-                     breaks=seq(0,2000000,by=200000))+
-  ggtitle("Historical price between commercial and residential properties")+
-  labs(caption = "Source: ATTOM Data Solutions")+
-  theme_classic()+
-  theme(axis.text.x=element_text(angle=30, hjust=1))
+  scale_color_brewer(palette = "Dark2") +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(name = "Transaction year",
+                     breaks = c(seq(1955, 2018, by = 5), 2018)) +
+  scale_y_continuous(name = "Average property value ($)",
+                     breaks = seq(0, 2000000, by = 200000)) +
+  ggtitle("Historical price between commercial and residential properties") +
+  labs(caption = "Source: ATTOM Data Solutions") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
 ```
 
 
 ---
 ## 2. Exploratory analysis
-```{r, echo=TRUE, warning=FALSE}
-by_year_own<-home_dta[home_dta$ownertypedescription1!=0,]%>%group_by(ownertypedescription1,deedlastsaledate)%>%summarize(num=n(),
-                                                                                           price=median(deedlastsaleprice,na.rm=TRUE),
-                                                  area=mean(areabuilding,na.rm=TRUE),
-                                              averageprice=mean(deedlastsaleprice/areabuilding,na.rm=TRUE),
-                                                  builtyear=mean(yearbuilt,na.rm=TRUE)
-                                                  )
+```{r}
+by_year_own <-
+  home_dta %>% filter(ownertypedescription1 != 0) %>% group_by(ownertypedescription1, deedlastsaledate) %>%
+  summarize(
+    num = n(),
+    price =
+      median(deedlastsaleprice, na.rm = TRUE),
+    area = mean(areabuilding, na.rm =
+                  TRUE),
+    averageprice = mean(deedlastsaleprice /
+                          areabuilding, na.rm = TRUE),
+    builtyear = mean(yearbuilt, na.rm =
+                       TRUE)
+  )
 #save(by_year_own,file = "D:/Langyi/graph_data/by_year_own.RData")
 ```
 
 ---
 ## 2. Exploratory analysis
-```{r, echo=TRUE, warning=FALSE}
-ggplot(by_year_own[by_year_own$deedlastsaledate>1955&
-                 by_year_own$deedlastsaledate<2019&
-                 is.na(by_year_own$deedlastsaledate)==FALSE&
-                 is.na(by_year_own$county)==FALSE,],
+```{r}
+ggplot(by_year_own%>%filter(deedlastsaledate %in%c(1955:2019)),
        aes(x = deedlastsaledate,
            y = price,
            color = ownertypedescription1)) +
   scale_color_brewer(palette = "Accent")+
-  geom_line(data=by_year_own[by_year_own$deedlastsaledate>1955&
-                           by_year_own$deedlastsaledate<2019,])+
-  geom_point(data=by_year_own[by_year_own$deedlastsaledate>1955&
-                           by_year_own$deedlastsaledate<2019,])+
+  geom_line()+
+  geom_point()+
   scale_x_continuous(name="Transaction year", 
                      breaks=c(seq(1955,2018,by=5),2018))+
   scale_y_continuous(name="Average property value ($)", 
@@ -595,100 +608,108 @@ ggplot(by_year_own[by_year_own$deedlastsaledate>1955&
   theme(axis.text.x=element_text(angle=30, hjust=1))
 ```
 
-```{r, echo=TRUE, warning=FALSE}
-home_dta_flood<-home_dta
-med_dist_coast<-median(home_dta_flood$dist_coast,na.rm = TRUE)
-med_floodrisk<-median(home_dta_flood$mdkt32,na.rm = TRUE)
-home_dta_flood$dist_coast1<-NA
-home_dta_flood$dist_coast1[home_dta_flood$dist_coast<=med_dist_coast]<-"no flood risk"
-home_dta_flood$dist_coast1[home_dta_flood$dist_coast>med_dist_coast]<-"with flood risk"
-home_dta_flood$dist_coast1<-home_dta_flood$dist_coast1%>%as.character()
-home_dta_flood$floodrisk1<-NA
-home_dta_flood$floodrisk1[home_dta_flood$mdkt32<=med_floodrisk]<-"no flood risk"
-home_dta_flood$floodrisk1[home_dta_flood$mdkt32>med_floodrisk]<-"with flood risk"
-home_dta_flood$floodrisk1<-home_dta_flood$floodrisk1%>%as.character()
-by_year_floodrisk<-home_dta_flood%>%group_by(floodrisk1,deedlastsaledate)%>%summarize(num=n(),
-                                                                                           price=median(deedlastsaleprice,na.rm=TRUE),
-                                                  area=mean(areabuilding,na.rm=TRUE),
-                                              averageprice=mean(deedlastsaleprice/areabuilding,na.rm=TRUE),
-                                              averagefrequency=mean(trans_times,na.rm=TRUE),
-                                                  builtyear=mean(yearbuilt,na.rm=TRUE))
+```{r}
+home_dta_flood <- home_dta
+med_dist_coast <- median(home_dta_flood$dist_coast, na.rm = TRUE)
+med_floodrisk <- median(home_dta_flood$mdkt32, na.rm = TRUE)
+home_dta_flood$dist_coast1 <- NA
+home_dta_flood$dist_coast1[home_dta_flood$dist_coast <= med_dist_coast] <-
+  "no flood risk"
+home_dta_flood$dist_coast1[home_dta_flood$dist_coast > med_dist_coast] <-
+  "with flood risk"
+home_dta_flood$dist_coast1 <-
+  home_dta_flood$dist_coast1 %>% as.character()
+home_dta_flood$floodrisk1 <- NA
+home_dta_flood$floodrisk1[home_dta_flood$mdkt32 <= med_floodrisk] <-
+  "no flood risk"
+home_dta_flood$floodrisk1[home_dta_flood$mdkt32 > med_floodrisk] <-
+  "with flood risk"
+home_dta_flood$floodrisk1 <-
+  home_dta_flood$floodrisk1 %>% as.character()
+by_year_floodrisk <-
+  home_dta_flood %>% group_by(floodrisk1, deedlastsaledate) %>% summarize(
+    num = n(),
+    price = median(deedlastsaleprice, na.rm = TRUE),
+    area = mean(areabuilding, na.rm = TRUE),
+    averageprice = mean(deedlastsaleprice / areabuilding, na.rm = TRUE),
+    averagefrequency = mean(trans_times, na.rm = TRUE),
+    builtyear = mean(yearbuilt, na.rm = TRUE)
+  )
 #save(by_year_floodrisk,file = "D:/Langyi/graph_data/by_year_floodrisk.RData")
 ```
 
 ---
 ## 2. Exploratory analysis
-```{r, echo=TRUE, warning=FALSE}
-ggplot(by_year_floodrisk[by_year_floodrisk$deedlastsaledate>2000&
-                 by_year_floodrisk$deedlastsaledate<2019&
-                 is.na(by_year_floodrisk$deedlastsaledate)==FALSE&
-                 is.na(by_year_floodrisk$county)==FALSE,],
-       aes(x = deedlastsaledate,
-           y = price,
-           color = floodrisk1)) +
-  scale_color_brewer(palette = "Set2")+
-  geom_line(data=by_year_floodrisk[by_year_floodrisk$deedlastsaledate>2000&
-                           by_year_floodrisk$deedlastsaledate<2019,])+
-  geom_point(data=by_year_floodrisk[by_year_floodrisk$deedlastsaledate>2000&
-                           by_year_floodrisk$deedlastsaledate<2019,])+
-  scale_x_continuous(name="Year of transaction", 
-                     breaks=c(seq(2000,2018,by=5),2018))+
-  scale_y_continuous(name="Average transaction price ($)", 
-                     breaks=seq(0,2000000,by=200000))+
-  ggtitle("Average transaction price for risky assets and non-risky assets")+
-  labs(caption = "Source: ATTOM Data Solutions")+
-  theme_classic()+
-  theme(axis.text.x=element_text(angle=30, hjust=1))
+```{r}
+ggplot(
+  by_year_floodrisk %>% filter(deedlastsaledate %in% c(1955:2019)),
+  aes(x = deedlastsaledate,
+      y = price,
+      color = floodrisk1)
+) +
+  scale_color_brewer(palette = "Set2") +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(name = "Year of transaction",
+                     breaks = c(seq(2000, 2018, by = 5), 2018)) +
+  scale_y_continuous(name = "Average transaction price ($)",
+                     breaks = seq(0, 2000000, by = 200000)) +
+  ggtitle("Average transaction price for risky assets and non-risky assets") +
+  labs(caption = "Source: ATTOM Data Solutions") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
 ```
 
 
-```{r, echo=TRUE, warning=FALSE}
-ggplot(by_year_floodrisk[by_year_floodrisk$deedlastsaledate>2000&
-                 by_year_floodrisk$deedlastsaledate<2019&
-                 is.na(by_year_floodrisk$deedlastsaledate)==FALSE&
-                 is.na(by_year_floodrisk$county)==FALSE,],
+```{r}
+ggplot(by_year_floodrisk %>% filter(deedlastsaledate %in% c(2000:2019)),
        aes(x = deedlastsaledate,
            y = averagefrequency,
            color = floodrisk1)) +
-  scale_color_brewer(palette = "Set2")+
-  geom_line(data=by_year_floodrisk[by_year_floodrisk$deedlastsaledate>2000&
-                           by_year_floodrisk$deedlastsaledate<2019,])+
-  geom_point(data=by_year_floodrisk[by_year_floodrisk$deedlastsaledate>2000&
-                           by_year_floodrisk$deedlastsaledate<2019,])+
-  scale_x_continuous(name="Year of transaction", 
-                     breaks=c(seq(2000,2018,by=5),2018))+
-  scale_y_continuous(name="Average transaction price ($)", 
-                     breaks=seq(0,2000000,by=200000))+
-  ggtitle("Average transaction frequency for risky assets and non-risky assets")+
-  labs(caption = "Source: ATTOM Data Solutions")+
-  theme_classic()+
-  theme(axis.text.x=element_text(angle=30, hjust=1))
+  scale_color_brewer(palette = "Set2") +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(name = "Year of transaction",
+                     breaks = c(seq(2000, 2018, by = 5), 2018)) +
+  scale_y_continuous(name = "Average transaction price ($)",
+                     breaks = seq(0, 2000000, by = 200000)) +
+  ggtitle("Average transaction frequency for risky assets and non-risky assets") +
+  labs(caption = "Source: ATTOM Data Solutions") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
 ```
 
 ---
 ## 2. Exploratory analysis
-```{r, echo=TRUE, warning=FALSE}
-by_city<-home_dta_flood%>%group_by(propertyaddresscity)%>%summarize(num=n(),
-                                                              county=unique(situscounty)[1],
-                                                                                           price=median(deedlastsaleprice,na.rm=TRUE),
-                                                  area=median(areabuilding,na.rm=TRUE),
-                                              averageprice=median(deedlastsaleprice/areabuilding,na.rm=TRUE),
-                                              averagefrequency=mean(trans_times,na.rm=TRUE),
-                                              builtyear=median(yearbuilt,na.rm=TRUE),
-                                              floodrisk=mean(mdkt32,na.rm = TRUE)
-                                                  )
-med_floodrisk<-median(by_city$floodrisk,na.rm = TRUE)
-by_city$floodrisk1<-NA
-by_city$floodrisk1[by_city$floodrisk==0]<-"no flood risk"
-by_city$floodrisk1[by_city$floodrisk<=med_floodrisk&
-                     by_city$floodrisk>0]<-"low flood risk"
-by_city$floodrisk1[by_city$floodrisk>med_floodrisk]<-"high flood risk"
-by_city$floodrisk1<-by_city$floodrisk1%>%as.character()
+```{r}
+by_city <-
+  home_dta_flood %>% group_by(propertyaddresscity) %>% summarize(
+    num = n(),
+    county = unique(situscounty)[1],
+    price =
+      median(deedlastsaleprice, na.rm = TRUE),
+    area = median(areabuilding, na.rm =
+                    TRUE),
+    averageprice = median(deedlastsaleprice /
+                            areabuilding, na.rm = TRUE),
+    averagefrequency = mean(trans_times, na.rm =
+                              TRUE),
+    builtyear = median(yearbuilt, na.rm =
+                         TRUE),
+    floodrisk = mean(mdkt32, na.rm = TRUE)
+  )
+med_floodrisk <- median(by_city$floodrisk, na.rm = TRUE)
+by_city$floodrisk1 <- NA
+by_city$floodrisk1[by_city$floodrisk == 0] <- "no flood risk"
+by_city$floodrisk1[by_city$floodrisk <= med_floodrisk &
+                     by_city$floodrisk > 0] <- "low flood risk"
+by_city$floodrisk1[by_city$floodrisk > med_floodrisk] <-
+  "high flood risk"
+by_city$floodrisk1 <- by_city$floodrisk1 %>% as.character()
 #save(by_city,file = "D:/Langyi/graph_data/by_city.RData")
 ```
 
-
-```{r, eval=FALSE,echo=TRUE, warning=FALSE}
+```{r, eval=FALSE}
 by_city_year<-home_dta_flood%>%group_by(propertyaddresscity,deedlastsaledate)%>%summarize(num=n(),
                                                               county=unique(situscounty)[1],
                                                                                            price=median(deedlastsaleprice,na.rm=TRUE),
@@ -719,6 +740,7 @@ ggplot(by_city,
   geom_point()+
   scale_color_brewer(palette = "OrRd", 
                      direction=-1)+
+  scale_size(guide = "none")+
   scale_x_continuous(name="Average transaction times in market")+
   scale_y_continuous(name="Average property value ($)", 
                      breaks=seq(0,2000000,by=200000))+
@@ -742,6 +764,7 @@ ggplot(by_city,
            size = num,
            color = floodrisk1)) +
   geom_point()+
+  scale_size(guide = "none")+
   scale_color_brewer(palette = "OrRd", 
                      direction=-1)+
   scale_x_continuous(name="Year built of property", 
@@ -774,38 +797,42 @@ Feature structure vary by county
 ---
 ## 3. Seperate modeling: one model for each city/county data
 The process for county-level modeling is rather straightforward.
-```{r, echo=TRUE, warning=FALSE}
-#Split data
-home_dta_less_city$propertyaddresscity<-home_dta_less_city$propertyaddresscity%>%as.character()
-home_city_dta<-split(home_dta_less_city,home_dta_less_city$propertyaddresscity)
-home_county_dta<-split(select(home_dta,-censustract),home_dta$situscounty)
+```{r}
+home_dta_less_city$propertyaddresscity <-
+  home_dta_less_city$propertyaddresscity %>% as.character()
+#Split data at city level
+home_city_dta <-
+  split(home_dta_less_city, home_dta_less_city$propertyaddresscity)
+#Split data at county level, get rid of census tract
+home_county_dta <-
+  split(select(home_dta, -censustract), home_dta$situscounty)
 ```
 
 ---
 ## 4. Feature selection with individual models
 Build function to automatically drop variables that are not important and are missing over 10% values, as we don't wish too many obs are omitted in tree model due to missing value.
-```{r, echo=TRUE, warning=FALSE}
+```{r}
 #Function to determine whether a variable is missing less than 10% values
-is.missing<-function(var,ratio = 0.1){
-    a<-var%>%length()
-    b<-var%>%is.na()%>%sum()
-    b/a < ratio
+is.missing <- function(var, ratio = 0.1) {
+  a <- var %>% length()
+  b <- var %>% is.na() %>% sum()
+  b / a < ratio
 }
 #Function to preprocess a data frame and drop according to is.missing
 #Here some features are kept due to their apparent relevancy which does not worth being dropped due to missing values
-drop.missing<-function(dta){
-  varnames_important<-names(dta)[1:14]
-  varnames_supplement<-names(dta)[-1:-14]
-  for (i in varnames_important){
-    var<-dta[[i]]
-    if (is.missing(var,ratio = 0.5)=="FALSE"){
-      dta<-select(dta,-i)
+drop.missing <- function(dta) {
+  varnames_important <- names(dta)[1:14]
+  varnames_supplement <- names(dta)[-1:-14]
+  for (i in varnames_important) {
+    var <- dta[[i]]
+    if (is.missing(var, ratio = 0.5) == "FALSE") {
+      dta <- select(dta, -i)
     }
   }
-  for (i in varnames_supplement){
-    var<-dta[[i]]
-    if (is.missing(var,ratio = 0.1)=="FALSE"){
-      dta<-select(dta,-i)
+  for (i in varnames_supplement) {
+    var <- dta[[i]]
+    if (is.missing(var, ratio = 0.1) == "FALSE") {
+      dta <- select(dta, -i)
     }
   }
   return(dta)
@@ -815,18 +842,18 @@ drop.missing<-function(dta){
 ---
 ## 4. Feature selection with individual models
 Apply the selection functions built just now to all subsamples
-```{r, echo=TRUE, warning=FALSE}
+```{r}
 #Apply to city the function in previous function for feature selection
-home_city_cleaned_dta<-purrr::map(home_city_dta,drop.missing)
-home_city_cleaned_dta<-purrr::map(home_city_cleaned_dta,drop.unary)
+home_city_cleaned_dta <- purrr::map(home_city_dta, drop.missing)
+home_city_cleaned_dta <- purrr::map(home_city_cleaned_dta, drop.unary)
 #Apply to county the function in previous function for feature selection
-home_county_cleaned_dta<-purrr::map(home_county_dta,drop.missing)
-home_county_cleaned_dta<-purrr::map(home_county_cleaned_dta,drop.unary)
+home_county_cleaned_dta <- purrr::map(home_county_dta, drop.missing)
+home_county_cleaned_dta <- purrr::map(home_county_cleaned_dta, drop.unary)
 ```
 ---
-## 5. Interactivity to check individual properties within sample
+## 5. Interactivity to check individual properties within sample (a playaround...)
 Build the ability to check for key features of individual properties using Google map
-```{r, echo=TRUE, warning=FALSE}
+```{r}
 #Provide an interactive leaflet for checking individual properties, Hendry County as an example.
 map.variable<-function(dta=home_county_cleaned_dta$Hendry,
                        varname="propertyusegroup"){
@@ -858,7 +885,7 @@ leaflet(dta) %>%
 }
 ```
 ---
-## 5. Interactivity to check individual properties within sample
+## 5. Interactivity to check individual properties within sample (a playaround...)
 Build the ability to check for key features of individual properties using Google map
 ```{r, eval=FALSE,echo=TRUE, warning=FALSE}
 map.variable(dta = home_city_cleaned_dta$AVENTURA)
@@ -867,47 +894,46 @@ map.variable(dta = home_city_cleaned_dta$AVENTURA)
 ---
 ## 6. Build predictive models for individual subgroups
 Develop functionality for final preprocessing before feeding data into model. Here we want to deal within each model very precisely the control of missing values and division of training/test test. Therefore, the process was distributed to each subsample and run independently.
-```{r, echo=TRUE, warning=FALSE}
+```{r}
 #Build final preprocess function
-model.preprocess<-function(dta,
-                           price_high,
-                           price_low,
-                           start_year,
-                           size){
-#Delete lng/lat
-dta$propertylatitude<-NULL
-dta$propertylongitude<-NULL
-#Recode tract to factor
-  if ("censustract"%in%names(dta)){
-    if (dta$censustract%>%unique()%>%length()<32){
-      dta$censustract<-dta$censustract%>%as.factor()
-    }else {
-      dta<-dta%>%select(-censustract)
+model.preprocess <- function(dta,
+                             price_high,
+                             price_low,
+                             start_year,
+                             size) {
+  #Delete lng/lat info used for geomapping
+  dta <- dta %>% select(-propertylatitude, -propertylongitude)
+  #Recode tract to factor. If there are more than 32 tracts, exclude tracts.
+  if ("censustract" %in% names(dta)) {
+    if (dta$censustract %>% unique() %>% length() < 32) {
+      dta$censustract <- dta$censustract %>% as.factor()
+    } else {
+      dta <- dta %>% select(-censustract)
     }
   }
-#Exclude NA in y variable
-dta<-filter(dta,is.na(dta$deedlastsaleprice)==FALSE)
-row_before<-nrow(dta)
-#Excluding high value transactions to suppress extreme values for convenience
-dta$deedlastsaleprice[dta$deedlastsaleprice>=price_high]<-NA
-#Excluding low value transactions which are not authentic
-dta$deedlastsaleprice[dta$deedlastsaleprice<=price_low]<-NA
-dta$deedlastsaleprice<-dta$deedlastsaleprice%>%
-  as.numeric()
-#Exclude NA in y variable again
-dta<-filter(dta,is.na(dta$deedlastsaleprice)==FALSE)
-row_after<-nrow(dta)
-retention<<-row_after/row_before
-#As past transaction reflect less information, we only pick recent years (after 2012)
-if ("deedlastsaledate"%in%names(dta))
-dta<-dta%>%filter(deedlastsaledate>=start_year)
-#Reduce size for computation convenience
-set.seed(0)
-  if (nrow(dta)>=size){
-    dta<-sample_n(dta,size)
+  #Exclude NA in y variable
+  dta <- filter(dta, is.na(dta$deedlastsaleprice) == FALSE)
+  row_before <- nrow(dta)
+  #Excluding high value transactions to suppress extreme values for convenience
+  dta$deedlastsaleprice[dta$deedlastsaleprice >= price_high] <- NA
+  #Excluding low value transactions which are not authentic
+  dta$deedlastsaleprice[dta$deedlastsaleprice <= price_low] <- NA
+  dta$deedlastsaleprice <- dta$deedlastsaleprice %>%
+    as.numeric()
+  #Exclude NA in y variable again
+  dta <- filter(dta, is.na(dta$deedlastsaleprice) == FALSE)
+  row_after <- nrow(dta)
+  retention <<- row_after / row_before
+  #As past transaction reflect less information, we only pick recent years (after 2012)
+  if ("deedlastsaledate" %in% names(dta))
+    dta <- dta %>% filter(deedlastsaledate >= start_year)
+  #Reduce size for computation convenience
+  set.seed(0)
+  if (nrow(dta) >= size) {
+    dta <- sample_n(dta, size)
   }
-dta<-drop.unary(dta)
-return(dta)
+  dta <- drop.unary(dta)
+  return(dta)
 }
 ```
 
