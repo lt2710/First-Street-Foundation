@@ -1391,9 +1391,9 @@ error.plot <- function(dta = error_matrix) {
 ---
 ## 8. Personalize filtering parameters for random forest
 Error performance for maximum observation within each model. 
-```{r, eval=FALSE}
+```{r}
 error_matrix<-NULL
-for (i in seq(100,1000,by=100)){
+for (i in seq(100,10000,200)){
 output<-modeling(home_county_cleaned_dta,
                  method="tree",
                       price_h=5000000,
@@ -1424,9 +1424,9 @@ error.plot(error_matrix)
 ## 8. Personalize filtering parameters for random forest
 Error performance for lowest price acceptable for property
 
-```{r, eval=FALSE}
+```{r}
 error_matrix<-NULL
-for (i in c(100,200,300,500,700,1000,3000,5000,7000,10000)){
+for (i in seq(100,10000,200)){
 output<-modeling(home_county_cleaned_dta,
                  method="tree",
                       price_h=5000000,
@@ -1456,9 +1456,9 @@ error.plot(error_matrix)
 ---
 ## 8. Personalize filtering parameters for random forest
 Error performance for starting year to filter the properties
-```{r, eval=FALSE}
+```{r}
 error_matrix<-NULL
-for (i in c(2000,2004,2007,2010,2012,2014,2015,2016,2017)){
+for (i in c(2000:2017)){
 output<-modeling(home_county_cleaned_dta,
                  method="tree",
                       price_h=5000000,
@@ -1488,9 +1488,9 @@ error.plot(error_matrix)
 ---
 ## 8. Personalize filtering parameters for random forest
 Error performance for highest price acceptable for properties. 
-```{r, eval=FALSE}
+```{r}
 error_matrix<-NULL
-for (i in c(100000,300000,500000,700000,1000000,3000000,5000000,7000000,10000000)){
+for (i in seq(100000,10000000,200000)){
 output<-modeling(home_county_cleaned_dta,
                  method="tree",
                       price_h=i,
@@ -1516,6 +1516,51 @@ This one looks at highest price acceptable for properties It seems
 ```{r}
 load("dta_processed/price_h.RData")
 error.plot(error_matrix)
+```
+
+---
+## 9. Iteration through cities/counties and view corss-validated model performance
+Cities
+```{r}
+rf_set_city<-modeling(home_city_cleaned_dta)%>%select(price_high:rf_5th)
+rf_set_city[order(rf_set_city$rf_MAPE),]%>%data.table()
+```
+
+---
+## 9. Iteration through cities/counties and view corss-validated model performance
+Counties
+```{r, echo=TRUE, warning=FALSE}
+rf_set_county<-modeling(home_county_cleaned_dta)%>%select(price_high:rf_5th)
+rf_set_county[order(rf_set_county$rf_MAPE),]%>%data.table()
+```
+
+---
+## 10. Map county-level model performance
+We want to see how each county performs on the map.
+```{r}
+#merge model performance data by county to parcel file
+rf_set_county1 <- rf_set_county
+rf_set_county1$subsample <-
+  rf_set_county1$subsample %>% str_sub(start = 4L)
+names(rf_set_county1)[5] <- "NAME"
+parcel@data <- inner_join(parcel@data, rf_set_county1, by = "NAME")
+```
+---
+## 10. Map county-level model performance
+Different measure and attributed displayed in the map
+```{r}
+tmap_arrange(
+  summary.county(varname = "preprocess_retention"),
+  summary.county(varname = "obs"),
+  summary.county(varname = "vars"),
+  summary.county(varname = "rf_MSE"),
+  summary.county(varname = "rf_MPE"),
+  summary.county(varname = "rf_MAPE"),
+  summary.county(varname = "rf_1st"),
+  summary.county(varname = "rf_2nd"),
+  summary.county(varname = "rf_3rd"),
+  ncol = 3
+)
 ```
 
 ---
