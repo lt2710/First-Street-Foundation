@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+  <head>
+    <title>Estimating Costal Property Values in Florida</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Langyi Tian" />
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
+    <link rel="stylesheet" href="custom_Xaringan.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Estimating Costal Property Values in Florida
+## Sample presentation slides
+### Langyi Tian
+### 2019/04/12
+
+---
+
+exclude: true
+
+class: left, top
+background-image: url(images/roadmap.png)
+background-size: 100%
+background-position: 50% 280%
+max-height: 10vh
+
+
+
+```r
+# Load packages.
+packages &lt;- c("tidyr", 
+              "dplyr",
+              "stringr",
+              "purrr", 
+              "data.table", 
+              "maps",
+              "glmnet",
+              "tree",
+              "knitr",
+              "ggplot2",
+              "gridExtra",
+              "rgdal",
+              "tmap",
+              "leaflet"
+              )
+packages &lt;- lapply(packages, FUN = function(x) {
+  if(!require(x, character.only = TRUE)) {
+    install.packages(x)
+  library(x, character.only = TRUE)
+  }
+}
+)
+```
+
+```
+## Loading required package: tidyr
+```
+
+```
+## Loading required package: dplyr
+```
+
+```
+## 
+## Attaching package: 'dplyr'
+```
+
+```
+## The following objects are masked from 'package:stats':
+## 
+##     filter, lag
+```
+
+```
+## The following objects are masked from 'package:base':
+## 
+##     intersect, setdiff, setequal, union
+```
+
+```
+## Loading required package: stringr
+```
+
+```
+## Loading required package: purrr
+```
+
+```
+## Loading required package: data.table
+```
+
+```
+## 
+## Attaching package: 'data.table'
+```
+
+```
+## The following object is masked from 'package:purrr':
+## 
+##     transpose
+```
+
+```
+## The following objects are masked from 'package:dplyr':
+## 
+##     between, first, last
+```
+
+```
+## Loading required package: maps
+```
+
+```
+## 
+## Attaching package: 'maps'
+```
+
+```
+## The following object is masked from 'package:purrr':
+## 
+##     map
+```
+
+```
+## Loading required package: glmnet
+```
+
+```
+## Loading required package: Matrix
+```
+
+```
+## 
+## Attaching package: 'Matrix'
+```
+
+```
+## The following object is masked from 'package:tidyr':
+## 
+##     expand
+```
+
+```
+## Loading required package: foreach
+```
+
+```
+## 
+## Attaching package: 'foreach'
+```
+
+```
+## The following objects are masked from 'package:purrr':
+## 
+##     accumulate, when
+```
+
+```
+## Loaded glmnet 2.0-18
+```
+
+```
+## Loading required package: tree
+```
+
+```
+## Loading required package: knitr
+```
+
+```
+## Loading required package: ggplot2
+```
+
+```
+## Warning in as.POSIXlt.POSIXct(Sys.time()): unable to identify current timezone 'C':
+## please set environment variable 'TZ'
+```
+
+```
+## Loading required package: gridExtra
+```
+
+```
+## 
+## Attaching package: 'gridExtra'
+```
+
+```
+## The following object is masked from 'package:dplyr':
+## 
+##     combine
+```
+
+```
+## Loading required package: rgdal
+```
+
+```
+## Loading required package: sp
+```
+
+```
+## rgdal: version: 1.4-4, (SVN revision 833)
+##  Geospatial Data Abstraction Library extensions to R successfully loaded
+##  Loaded GDAL runtime: GDAL 2.2.3, released 2017/11/20
+##  Path to GDAL shared files: C:/Program Files/R/R-3.6.1/library/rgdal/gdal
+##  GDAL binary built with GEOS: TRUE 
+##  Loaded PROJ.4 runtime: Rel. 4.9.3, 15 August 2016, [PJ_VERSION: 493]
+##  Path to PROJ.4 shared files: C:/Program Files/R/R-3.6.1/library/rgdal/proj
+##  Linking to sp version: 1.3-1
+```
+
+```
+## Loading required package: tmap
+```
+
+```
+## Loading required package: leaflet
+```
+
+
+```r
+library("knitr")
+knitr::opts_chunk$set(
+  echo = TRUE,
+  eval = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  figure.height = 7,
+  figure.width = 15,
+  figure.align = "center",
+  cache = TRUE,
+  cache.lazy = FALSE
+)
+#knitr::opts_knit$set(root.dir = "C:\\Users\\Tianl\\Documents\\GitHub\\First-Street-Foundation")
+options(htmltools.dir.version = FALSE)
+```
+
+
+```r
+theme_simplemap &lt;- function(base_size = 9, base_family = "") {
+  theme_bw(base_size = base_size, base_family = base_family) %+replace%
+    theme(axis.line = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks = element_blank(),
+          axis.title = element_blank(),
+          panel.background = element_blank(),
+          panel.border = element_blank(),
+          panel.grid = element_blank(),
+          panel.spacing = unit(0, "lines"),
+          plot.background = element_blank(),
+          legend.position = "none")
+}
+```
+##Simple AB Test
+You own a vacation house in Florida. One day you are surprised to find its market value drops. Two explanations in seperate ways.
+
+ - "Your home suffers from high risk from frequent tidal flooding."
+ - "Your home would have worth $751,176, now it only worth $736,230 due to frequent tidal flooding."
+ 
+Which one seems more convincing?
+
+--
+![website sample](floodiq_sample.png)
+---
+## Executive summary
+Objective
+ - Organizational mission: Quantify the financial risk of tidal flooding to address stakeholder concern
+ - Task for this research: Make the numbers more accurate with market value estimation
+
+Data
+ - Administrative property records (3 million), transaction records from ATTOM Data Solutions
+ - Demographic data from census data
+ - Flooding projections and other climate data from National Oceanic and Atmospheric Administration (NOAA) 
+ 
+Methodology
+ - Build seperate models within each city and county to account for geographical variation and improve data quality
+ - Regularization models (Ridge, LASSO) as baseline
+ - Regression trees ry random forest and gradient boosting as comparison for trial models
+
+Findings
+ - Trees work better than baseline
+ - Random forest algorithm consistently outperform gradient boosting
+ - City-level models have varying performance
+ - Ability to predict within 10% deviation in some cities
+ - Key filtering parameters should be optimized to improve prediction
+ - Transaction time and building area are 2 primary factors of property value
+ 
+---
+## Project roadmap
+
+1. Data preparation
+2. Exploratory analysis
+3. Seperate modeling: one model for each city/county data
+4. Feature selection with individual models
+5. Build seperate predictive models for 85 city-level subsamples
+6. Functionalities to test and parse out performance metrics for regularized models and regression trees
+7. Personalize data filtering parameters
+8. Iteration through cities/counties and view corss-validated model performance, map county-level model performance
+
+---
+## 1. Data preparation
+Select features from property records in a real estate broker's database. 
+
+```r
+#Input original dataset 1: property data
+home_dta_original&lt;-fread("raw_data/SF_Home_Characteristics.csv")
+save(home_dta_original, file = "dta_processed/SF_Taxassessor_original.RData")
+#Select features to import, subset and save
+home_dta &lt;- select(
+  home_dta_original,
+  attomid,
+  #Matching ID
+  deedlastsaleprice,
+  #Transaction price last sale
+  situsstatecode,
+  #State code
+  situscounty,
+  #County code
+  propertyaddresscity,
+  #City code
+  ownertypedescription1,
+  #First owner is individual/company?
+  ownertypedescription2,
+  #Second owner is individual/company?
+  deedlastsaledate,
+  #Date of market sale
+  yearbuilt,
+  #Year when built
+  propertyusegroup,
+  #Commercial/residential?
+  areabuilding,
+  #Living area in sq.feet
+  censustract,
+  #Census tract division
+  propertylatitude,
+  #Lat of property
+  propertylongitude,
+  #Lon of property
+  roomsatticflag,
+  #See below
+  parkinggarage:communityrecroomflag#A series variable measuring physical attributes of the property, including rooms count and relevant facilities
+)
+save(home_dta, file = "dta_processed/SF_Taxassessor_reduced.RData")
+#errrrrrrrrrr
+
+
+
+#rrrrr
+```
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();</script>
+
+<script>
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

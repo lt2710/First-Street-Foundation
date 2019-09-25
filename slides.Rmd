@@ -1,26 +1,28 @@
 ---
 title: "Estimating Costal Property Values in Florida"
-subtitle: "Sample presentation slides"
 author: "Langyi Tian"
-date: "2019/04/12"
-output:
-  xaringan::moon_reader:
-    css: ["default", "default-fonts", "custom_Xaringan.css"]
-    lib_dir: libs
-    nature:
-      highlightStyle: github
-      highlightLines: true
-      countIncrementalSlides: false
+output: html_document: default
       
 ---
+exclude: true
 
 class: left, top
 background-image: url(images/roadmap.png)
 background-size: 100%
 background-position: 50% 280%
 
+```{r}
+#place for different output choice
+#  xaringan::moon_reader:
+#    css: ["default", "default-fonts", "custom_Xaringan.css"]
+#    lib_dir: libs
+#    nature:
+#      highlightStyle: github
+#      highlightLines: true
+#      countIncrementalSlides: false
+```
 
-```{r packages, message = FALSE, warning = FALSE, echo=FALSE}
+```{r packages}
 # Load packages.
 packages <- c("tidyr", 
               "dplyr",
@@ -46,10 +48,10 @@ packages <- lapply(packages, FUN = function(x) {
 )
 ```
 
-```{r setup, include=FALSE}
+```{r setup}
 library("knitr")
 knitr::opts_chunk$set(
-  echo = FALSE,
+  echo = TRUE,
   eval = TRUE,
   message = FALSE,
   warning = FALSE,
@@ -59,11 +61,11 @@ knitr::opts_chunk$set(
   cache = TRUE,
   cache.lazy = FALSE
 )
-knitr::opts_knit$set(root.dir = "C:\\Users\\Tianl\\Documents\\GitHub\\First-Street-Foundation")
+#knitr::opts_knit$set(root.dir = "C:\\Users\\Tianl\\Documents\\GitHub\\First-Street-Foundation")
 options(htmltools.dir.version = FALSE)
 ```  
 
-```{r theme-map, include=FALSE}
+```{r theme-map}
 theme_simplemap <- function(base_size = 9, base_family = "") {
   theme_bw(base_size = base_size, base_family = base_family) %+replace%
     theme(axis.line = element_blank(),
@@ -77,9 +79,10 @@ theme_simplemap <- function(base_size = 9, base_family = "") {
           plot.background = element_blank(),
           legend.position = "none")
 }
-```  
+``` 
+
 ##Simple AB Test
-You own a vacation house in Florida. One day you are surprised to find its market value drops. Two people explain to you in seperate ways.
+You own a vacation house in Florida. One day you are surprised to find its market value drops. Two explanations in seperate ways.
 
  - "Your home suffers from high risk from frequent tidal flooding."
  - "Your home would have worth $751,176, now it only worth $736,230 due to frequent tidal flooding."
@@ -91,66 +94,46 @@ Which one seems more convincing?
 ---
 ## Executive summary
 Objective
- - Quantify the financial risk of tidal flooding to address stakeholder concern
+ - Organizational mission: Quantify the financial risk of tidal flooding to address stakeholder concern
+ - Task for this research: Make the numbers more accurate with market value estimation
 
 Data
- -All properties (>3 million) in South Florida
- -Attributes and historical transaction information
+ - Administrative property records (3 million), transaction records from ATTOM Data Solutions
+ - Demographic data from census data
+ - Flooding projections and other climate data from National Oceanic and Atmospheric Administration (NOAA) 
  
 Methodology
- - Automize the selection, transformation of features
  - Build seperate models within each city and county to account for geographical variation and improve data quality
- - Try random forest and gradient boosting as comparison for trial models
+ - Regularization models (Ridge, LASSO) as baseline
+ - Regression trees ry random forest and gradient boosting as comparison for trial models
 
 Findings
+ - Trees work better than baseline
  - Random forest algorithm consistently outperform gradient boosting
- - City-level models have varying performance and higher potential
+ - City-level models have varying performance
  - Ability to predict within 10% deviation in some cities
- - Key filtering parameters are optimized to improve prediction
- - Transaction time and building area is 2 primary factors of property value
+ - Key filtering parameters should be optimized to improve prediction
+ - Transaction time and building area are 2 primary factors of property value
  
 ---
-## Roadmap
+## Project roadmap
 
-0. Data science solution to the flooding risk concern
 1. Data preparation
 2. Exploratory analysis
 3. Seperate modeling: one model for each city/county data
 4. Feature selection with individual models
-5. Interactivity to check individual properties within sample
-6. Build predictive models for individual subgroups
-7. Test between random forest and gradient boosting
-8. Personalize filtering parameters for random forest
-9. Iteration through cities/counties and view corss-validated model performance
-10. Map county-level model performance
-
-*Some codes are partially displayed. For full code I recommend to go to rmd file.
-*I have signed a confidentiality agreement with First Street Foundation, and please let me know before you reuse, share, or distribute the materials.
+5. Build seperate predictive models for 85 city-level subsamples
+6. Functionalities to test and parse out performance metrics for regularized models and regression trees
+7. Personalize data filtering parameters
+8. Iteration through cities/counties and view corss-validated model performance, map county-level model performance
 
 ---
-## 0. Data science solution to the flooding risk concern
-
-Target audience: Costal homeowners
-
-Pain point: Costal properties are highly valuable but also extremely vulnerable to climate change, especially flooding risk
- - "All of my money right now is in my home."
- - "I doubt we will continue to have this property in the future. (For our children)  - It's just determining the right time to sell."
-
-Data Science Solution: Quantify the impact by calculating financial loss
- - Supervised learning to target the market value of a property
- - A regression problem to model the fluctuating numerical price
-
----
-
 ## 1. Data preparation
-Select relevant features from raw data, which comes from a real estate broker's data base. Observations are properties and variables are relevant attributes.
+Select features from property records in a real estate broker's database. 
 ```{r, eval=FALSE}
 #Input original dataset 1: property data
 home_dta_original<-fread("raw_data/SF_Home_Characteristics.csv")
 save(home_dta_original, file = "dta_processed/SF_Taxassessor_original.RData")
-```
-
-```{r, eval=FALSE}
 #Select features to import, subset and save
 home_dta <- select(
   home_dta_original,
@@ -189,18 +172,24 @@ home_dta <- select(
 save(home_dta, file = "dta_processed/SF_Taxassessor_reduced.RData")
 ```
 
+---
+## 1. Data preparation
+Select features from environmental risk and demographic data set constructed by Porter
 ```{r, eval=FALSE}
 #Import dataset 2: property and environmental risk, subset and save
 risk_dta_original <-
   fread("raw_data/SF_Parcel_Risk_and_Spatial_Data.csv")
 save(risk_dta_original, file = "dta_processed/SF_Parcel_Risk_and_Spatial_Data_original.RData")
-risk_dta <- risk_dta_original %>% select(attomid = ATTOM_ID,
-                                         dist_coast,
-                                         mdkt32,
-                                         Totpopbg:near_reading_rates,)
+risk_dta <- risk_dta_original %>% select(attomid = ATTOM_ID,#ID
+                                         dist_coast,#Distance to coast
+                                         mdkt32,#Flooding probability estimate in next years
+                                         Totpopbg:near_reading_rates,)#a set of demographic information varying by census tract 
 save(risk_dta, file = "dta_processed/SF_Parcel_Risk_and_Spatial_Data_reduced.RData")
 ```
 
+---
+## 1. Data preparation
+Get a simple feature of transaction frequence from transaction records
 ```{r, eval=FALSE}
 #Import dataset 3: property transactions, subset and save
 trans_dta_original <-
@@ -234,7 +223,7 @@ home_dta_ver1 %>% report.dim()
 
 ---
 ## 1. Data preparation
-Recoding and transforming features, mostly to kick out less meaningful factor levels and values miscoded
+Recoding and transforming features
 ```{r}
 #This chunk of recoding is not supposed to change data dimension
 #Fill in the price variable so that it will not be dropped later
@@ -390,7 +379,8 @@ summary.variable <- function(varname = "deedlastsaleprice",
 ```
 
 
-```{r}
+```{r, eval=FALSE}
+#Explorative function to plot summary statistics for a set of variables
 var_plots <- lapply(colnames(home_dta), summary.variable)
 grid_plot <- function(start_num = 1) {
   grid.arrange(
@@ -731,7 +721,7 @@ by_city_year$floodrisk1<-by_city_year$floodrisk1%>%as.character()
 
 ---
 ## 2. Exploratory analysis
-```{r, echo=TRUE, warning=FALSE}
+```{r}
 ggplot(by_city,
        aes(x = averagefrequency,
            y = price,
@@ -757,7 +747,7 @@ ggplot(by_city,
 
 ---
 ## 2. Exploratory analysis
-```{r, echo=TRUE, warning=FALSE}
+```{r}
 ggplot(by_city,
        aes(x = builtyear,
            y = price,
@@ -902,7 +892,8 @@ model.preprocess <- function(dta,
                              start_year,
                              size) {
   #Delete lng/lat info used for geomapping
-  dta <- dta %>% select(-propertylatitude, -propertylongitude)
+  dta$propertylatitude<-NULL
+  dta$propertylongitude<-NULL
   #Recode tract to factor. If there are more than 32 tracts, exclude tracts.
   if ("censustract" %in% names(dta)) {
     if (dta$censustract %>% unique() %>% length() < 32) {
@@ -911,23 +902,22 @@ model.preprocess <- function(dta,
       dta <- dta %>% select(-censustract)
     }
   }
-  #Exclude NA in y variable
-  dta <- filter(dta, is.na(dta$deedlastsaleprice) == FALSE)
+  dta <-
+    filter(dta, is.na(dta$deedlastsaleprice) == FALSE)#Exclude NA in y variable
   row_before <- nrow(dta)
   #Excluding high value transactions to suppress extreme values for convenience
   dta$deedlastsaleprice[dta$deedlastsaleprice >= price_high] <- NA
   #Excluding low value transactions which are not authentic
   dta$deedlastsaleprice[dta$deedlastsaleprice <= price_low] <- NA
-  dta$deedlastsaleprice <- dta$deedlastsaleprice %>%
-    as.numeric()
+  dta$deedlastsaleprice <- dta$deedlastsaleprice %>% as.numeric()
   #Exclude NA in y variable again
   dta <- filter(dta, is.na(dta$deedlastsaleprice) == FALSE)
   row_after <- nrow(dta)
   retention <<- row_after / row_before
-  #As past transaction reflect less information, we only pick recent years (after 2012)
+  #Pick a start year for modeling
   if ("deedlastsaledate" %in% names(dta))
     dta <- dta %>% filter(deedlastsaledate >= start_year)
-  #Reduce size for computation convenience
+  #Option to reduce sample size for computation convenience
   set.seed(0)
   if (nrow(dta) >= size) {
     dta <- sample_n(dta, size)
@@ -943,270 +933,332 @@ I decided to use random forest and gradient boosting as the first try. Random fo
 
 Here a model comparison with output from random forest and gradient boosting is built. It will generate several attributes of the model as well as some key performance index of the 2 tree algorithms.
 
-```{r, echo=TRUE, warning=FALSE}
-model.comparison.tree<-function(dta,preprocess_retention=retention){
-#Split training/test samples (0.7:0.3)
-train<-sample_frac(dta,size=0.7)
-test<-anti_join(dta,train,by="attomid")
-#Prepare y and x features
-train<-select(train,
-          -attomid,
-          -situsstatecode,
-          -situscounty,
-          -propertyaddresscity)
-y<-train$deedlastsaleprice
-x<-select(train,
-          -deedlastsaleprice)
-#Try random forest
-library(randomForest)
-train_rf <- randomForest(y~.,x,
-                         importance = TRUE,
-                         na.action = "na.omit"
-                         )
-rf_summary<-importance(train_rf)%>%as.data.frame()
-rf_highvars<-rf_summary[order(rf_summary$`%IncMSE`, 
-                 decreasing = TRUE),]%>%head(5)%>%row.names()
-if (length(rf_highvars)<5){
-  add<-5-length(rf_highvars)
-  rf_highvars<-c(rf_highvars,rep(NA,add))
-}
-#Test set
-yhat.rf <- predict(train_rf,test)
-rf_MSE<-mean((yhat.rf-test$deedlastsaleprice)^2,na.rm = TRUE)
-rf_MPE<-mean((yhat.rf-test$deedlastsaleprice)/test$deedlastsaleprice,na.rm = TRUE)
-rf_MAPE<-mean(abs((yhat.rf-test$deedlastsaleprice)/test$deedlastsaleprice),na.rm = TRUE)
-#Boosting
-library(gbm)
-train_gb <- gbm(y~.,x,
-                n.trees = 1000,
-                    distribution = "gaussian"
-)
-gb_summary<-summary(train_gb,plotit = FALSE)
-gb_highvars<-gb_summary[order(gb_summary$rel.inf, 
-                 decreasing = TRUE),]%>%head(5)%>%row.names()
-if (length(gb_highvars)<5){
-  add<-5-length(gb_highvars)
-  gb_highvars<-c(gb_highvars,rep(NA,add))
-}
-#Test set
-yhat.gb <- predict(train_gb,test,n.trees = 1000)
-gb_MSE<-mean((yhat.gb-test$deedlastsaleprice)^2,na.rm = TRUE)
-gb_MPE<-mean((yhat.gb-test$deedlastsaleprice)/test$deedlastsaleprice,na.rm = TRUE)
-gb_MAPE<-mean(abs((yhat.gb-test$deedlastsaleprice)/test$deedlastsaleprice),na.rm = TRUE)
-#Store comparison between rf and gb
-if (dta$propertyaddresscity%>%unique()%>%length()==1){
-  subsample_name<-paste(dta$situsstatecode%>%unique()%>%as.character()%>%paste(collapse ="_"),
-                      dta$situscounty%>%unique()%>%as.character()%>%paste(collapse ="_"),
-                      dta$propertyaddresscity%>%unique()%>%as.character()%>%paste(collapse ="_"),
-                      sep = "_")
-} else {
-  subsample_name<-paste(dta$situsstatecode%>%unique()%>%as.character()%>%paste(collapse ="_"),
-                        dta$situscounty%>%unique()%>%as.character()%>%paste(collapse ="_"))
-  
-}
-comparison<-c(subsample_name,
-              preprocess_retention,
-              nrow(dta),
-              ncol(dta),
-              rf_MSE,
-              rf_MPE,
-              rf_MAPE,
-              rf_highvars,
-              gb_MSE,
-              gb_MPE,
-              gb_MAPE,
-              gb_highvars)%>%as.data.frame%>%t()
-colnames(comparison)<-c("subsample",
-                        "preprocess_retention",
-                        "obs",
-                        "vars",
-                        "rf_MSE",
-                        "rf_MPE",
-                        "rf_MAPE",
-                         "rf_1st",
-                         "rf_2nd",
-                         "rf_3rd",
-                         "rf_4th",
-                         "rf_5th",
-                        "gb_MSE",
-                        "gb_MPE",
-                        "gb_MAPE",
-                         "gb_1st",
-                         "gb_2nd",
-                         "gb_3rd",
-                         "gb_4th",
-                         "gb_5th")
-return(comparison)
-}
+```{r}
+model.comparison.tree <-
+  function(dta, preprocess_retention = retention) {
+    #Split training/test samples (0.7:0.3)
+    train <- sample_frac(dta, size = 0.7)
+    test <- anti_join(dta, train, by = "attomid")
+    #Prepare y and x features
+    train <-
+      select(train,
+             -attomid,
+             -situsstatecode,
+             -situscounty,
+             -propertyaddresscity)
+    y <- train$deedlastsaleprice
+    x <- select(train, -deedlastsaleprice)
+    #Try random forest
+    library(randomForest)
+    train_rf <- randomForest(y ~ ., x,
+                             importance = TRUE,
+                             na.action = "na.omit")
+    rf_summary <- importance(train_rf) %>% as.data.frame()
+    rf_highvars <- rf_summary[order(rf_summary$`%IncMSE`,
+                                    decreasing = TRUE),] %>% head(5) %>% row.names()
+    if (length(rf_highvars) < 5) {
+      rf_highvars <- c(rf_highvars, rep(NA, (5 - length(rf_highvars))))
+    }
+    #Test set
+    yhat.rf <- predict(train_rf, test)
+    rf_MSE <-
+      mean((yhat.rf - test$deedlastsaleprice) ^ 2, na.rm = TRUE)
+    rf_MPE <-
+      mean((yhat.rf - test$deedlastsaleprice) / test$deedlastsaleprice,
+           na.rm = TRUE)
+    rf_MAPE <-
+      mean(abs((yhat.rf - test$deedlastsaleprice) / test$deedlastsaleprice), na.rm = TRUE)
+    #Boosting
+    library(gbm)
+    train_gb <- gbm(y ~ ., x,
+                    n.trees = 1000,
+                    distribution = "gaussian")
+    gb_summary <- summary(train_gb, plotit = FALSE)
+    gb_highvars <- gb_summary[order(gb_summary$rel.inf,
+                                    decreasing = TRUE),] %>% head(5) %>% row.names()
+    if (length(gb_highvars) < 5) {
+      add <- 5 - length(gb_highvars)
+      gb_highvars <- c(gb_highvars, rep(NA, add))
+    }
+    #Test set
+    yhat.gb <- predict(train_gb, test, n.trees = 1000)
+    gb_MSE <-
+      mean((yhat.gb - test$deedlastsaleprice) ^ 2, na.rm = TRUE)
+    gb_MPE <-
+      mean((yhat.gb - test$deedlastsaleprice) / test$deedlastsaleprice,
+           na.rm = TRUE)
+    gb_MAPE <-
+      mean(abs((yhat.gb - test$deedlastsaleprice) / test$deedlastsaleprice), na.rm = TRUE)
+    #Store comparison between rf and gb
+    if (dta$propertyaddresscity %>% unique() %>% length() == 1) {
+      subsample_name <-
+        paste(
+          dta$situsstatecode %>% unique() %>% as.character() %>% paste(collapse =
+                                                                         "_"),
+          dta$situscounty %>% unique() %>% as.character() %>%
+            paste(collapse = "_"),
+          dta$propertyaddresscity %>% unique() %>% as.character() %>%
+            paste(collapse = "_"),
+          sep = "_"
+        )
+    } else {
+      subsample_name <-
+        paste(
+          dta$situsstatecode %>% unique() %>% as.character() %>% paste(collapse =
+                                                                         "_"),
+          dta$situscounty %>% unique() %>% as.character() %>%
+            paste(collapse = "_")
+        )
+      
+    }
+    comparison <- c(
+      subsample_name,
+      preprocess_retention,
+      nrow(dta),
+      ncol(dta),
+      rf_MSE,
+      rf_MPE,
+      rf_MAPE,
+      rf_highvars,
+      gb_MSE,
+      gb_MPE,
+      gb_MAPE,
+      gb_highvars
+    ) %>% as.data.frame %>% t()
+    colnames(comparison) <- c(
+      "subsample",
+      "preprocess_retention",
+      "obs",
+      "vars",
+      "rf_MSE",
+      "rf_MPE",
+      "rf_MAPE",
+      "rf_1st",
+      "rf_2nd",
+      "rf_3rd",
+      "rf_4th",
+      "rf_5th",
+      "gb_MSE",
+      "gb_MPE",
+      "gb_MAPE",
+      "gb_1st",
+      "gb_2nd",
+      "gb_3rd",
+      "gb_4th",
+      "gb_5th"
+    )
+    return(comparison)
+  }
 ```
 
-```{r, echo=TRUE, warning=FALSE}
-model.comparison.regularization<-function(dta,preprocess_retention=retention){
-preprocess_retention<-retention
-#Split training/test samples (0.7:0.3)
-train<-sample_frac(dta,size=0.7)
-test<-anti_join(dta,train,by="attomid")
-#Prepare y and x features in train
-train<-train%>%select(-attomid,
-                  -situsstatecode,
-                  -situscounty,
-                  -propertyaddresscity)
-essential.var<-intersect(names(dta),c("deedlastsaledate",
-                       "yearbuilt",
-                       "areabuilding",
-                       "censustract"))%>%paste(collapse = "+")
-if ("deedlastsaledate"%in%names(dta)){
-  formula.1<-as.formula(paste("deedlastsaleprice~
+```{r}
+model.comparison.regularization <-
+  function(dta, preprocess_retention = retention) {
+    preprocess_retention <- retention
+    #Split training/test samples (0.7:0.3)
+    train <- sample_frac(dta, size = 0.7)
+    test <- anti_join(dta, train, by = "attomid")
+    #Prepare y and x features in train
+    train <- train %>% select(-attomid,-situsstatecode,-situscounty,-propertyaddresscity)
+    essential.var <- intersect(names(dta),
+                               c(
+                                 "deedlastsaledate",
+                                 "yearbuilt",
+                                 "areabuilding",
+                                 "censustract"
+                               )) %>% paste(collapse = "+")
+    if ("deedlastsaledate" %in% names(dta)) {
+      formula.1 <- as.formula(
+        paste(
+          "deedlastsaleprice~
                    I(deedlastsaledate^5)+
                   I(deedlastsaledate^4)+
                   I(deedlastsaledate^3)+
                   I(deedlastsaledate^2)+(",
-                  paste(essential.var),")^2+
-                    (.)"))
-}else{
-  formula.1<-as.formula(paste("deedlastsaleprice~(",paste(essential.var),")^2+(.)"))
-}
-train<-model.frame(formula.1,
-                 data = train,
-                 na.action = na.omit)
-y.train<-train$deedlastsaleprice
-x.train<-model.matrix(formula.1,
-                      data=train)
-#Prepare test
-test<-test%>%select(-attomid,
-                  -situsstatecode,
-                  -situscounty,
-                  -propertyaddresscity)
-test<-model.frame(formula.1,
-                 data = test,
-                 na.action = na.omit)
-y.test<-test$deedlastsaleprice
-x.test<-model.matrix(formula.1,
-                     data=test)
-#Predict with Ridge
-cv.out <- cv.glmnet(x.train,y.train, alpha = 0)
-bestlam <- cv.out$lambda.min
-out <- glmnet(x.train,y.train, nlambda = 1, lambda = bestlam, alpha = 0)
-yhat.ridge <- predict(cv.out, s = bestlam, newx <- x.test)
-ridge_MSE<-mean((yhat.ridge-y.test)^2,na.rm = TRUE)
-ridge_MPE<-mean((yhat.ridge-y.test)/y.test,na.rm = TRUE)
-ridge_MAPE<-mean(abs((yhat.ridge-y.test)/y.test),na.rm = TRUE)
-#Predict with LASSO
-cv.out <- cv.glmnet(x.train,y.train, alpha = 1)
-bestlam <- cv.out$lambda.min
-out <- glmnet(x.train,y.train, nlambda = 1, lambda = bestlam, alpha = 1)
-yhat.LASSO <- predict(cv.out, s = bestlam, newx <- x.test)
-LASSO_MSE<-mean((yhat.LASSO-y.test)^2,na.rm = TRUE)
-LASSO_MPE<-mean((yhat.LASSO-y.test)/y.test,na.rm = TRUE)
-LASSO_MAPE<-mean(abs((yhat.LASSO-y.test)/y.test),na.rm = TRUE)
-#Export important variables
-LASSO_coef<-coef(out)%>%row.names()%>%cbind(coef(out)%>%as.numeric())
-LASSO_coef<-LASSO_coef%>%as.data.frame()
-names(LASSO_coef)<-c("var","coef")
-LASSO_coef$coef<-LASSO_coef$coef%>%as.character()%>%as.numeric()
-LASSO_coef$var<-LASSO_coef$var%>%as.character()
-LASSO_coef$abs_coef<-abs(LASSO_coef$coef)
-LASSO_coef<-LASSO_coef[order(LASSO_coef$abs_coef,decreasing = TRUE),]
-LASSO_vars<-LASSO_coef$var[LASSO_coef$coef!=0&
-                   LASSO_coef$var!="(Intercept)"]
-LASSO_length<-LASSO_vars%>%length()
-LASSO_names<-LASSO_vars%>%paste(collapse = "  |  ")
-#Store comparison between Ridge and LASSO
-if (dta$propertyaddresscity%>%unique()%>%length()==1){
-  subsample_name<-paste(dta$situsstatecode%>%unique()%>%as.character()%>%paste(collapse ="_"),
-                      dta$situscounty%>%unique()%>%as.character()%>%paste(collapse ="_"),
-                      dta$propertyaddresscity%>%unique()%>%as.character()%>%paste(collapse ="_"),
-                      sep = "_")
-} else {
-  subsample_name<-paste(dta$situsstatecode%>%unique()%>%as.character()%>%paste(collapse ="_"),
-                        dta$situscounty%>%unique()%>%as.character()%>%paste(collapse ="_"))
-  
-}
-comparison<-c(subsample_name,
-              preprocess_retention,
-              nrow(dta),
-              ncol(dta),
-              ridge_MSE,
-              ridge_MPE,
-              ridge_MAPE,
-              LASSO_MSE,
-              LASSO_MPE,
-              LASSO_MAPE,
-              LASSO_length,
-              LASSO_names)%>%as.data.frame%>%t()
-colnames(comparison)<-c("subsample",
-                        "preprocess_retention",
-                        "obs",
-                        "vars",
-                        "ridge_MSE",
-                        "ridge_MPE",
-                        "ridge_MAPE",
-                        "LASSO_MSE",
-                        "LASSO_MPE",
-                        "LASSO_MAPE",
-                        "LASSO_length",
-                        "LASSO_names")
-return(comparison)
-}
+          paste(essential.var),
+          ")^2+
+                    (.)"
+        )
+      )
+    } else{
+      formula.1 <-
+        as.formula(paste("deedlastsaleprice~(", paste(essential.var), ")^2+(.)"))
+    }
+    train <- model.frame(formula.1,
+                         data = train,
+                         na.action = na.omit)
+    y.train <- train$deedlastsaleprice
+    x.train <- model.matrix(formula.1,
+                            data = train)
+    #Prepare test
+    test <- test %>% select(-attomid,-situsstatecode,-situscounty,-propertyaddresscity)
+    test <- model.frame(formula.1,
+                        data = test,
+                        na.action = na.omit)
+    y.test <- test$deedlastsaleprice
+    x.test <- model.matrix(formula.1,
+                           data = test)
+    #Predict with Ridge
+    cv.out <- cv.glmnet(x.train, y.train, alpha = 0)
+    bestlam <- cv.out$lambda.min
+    out <-
+      glmnet(
+        x.train,
+        y.train,
+        nlambda = 1,
+        lambda = bestlam,
+        alpha = 0
+      )
+    yhat.ridge <- predict(cv.out, s = bestlam, newx <- x.test)
+    ridge_MSE <- mean((yhat.ridge - y.test) ^ 2, na.rm = TRUE)
+    ridge_MPE <- mean((yhat.ridge - y.test) / y.test, na.rm = TRUE)
+    ridge_MAPE <- mean(abs((yhat.ridge - y.test) / y.test), na.rm = TRUE)
+    #Predict with LASSO
+    cv.out <- cv.glmnet(x.train, y.train, alpha = 1)
+    bestlam <- cv.out$lambda.min
+    out <-
+      glmnet(
+        x.train,
+        y.train,
+        nlambda = 1,
+        lambda = bestlam,
+        alpha = 1
+      )
+    yhat.LASSO <- predict(cv.out, s = bestlam, newx <- x.test)
+    LASSO_MSE <- mean((yhat.LASSO - y.test) ^ 2, na.rm = TRUE)
+    LASSO_MPE <- mean((yhat.LASSO - y.test) / y.test, na.rm = TRUE)
+    LASSO_MAPE <- mean(abs((yhat.LASSO - y.test) / y.test), na.rm = TRUE)
+    #Export important variables
+    LASSO_coef <-
+      coef(out) %>% row.names() %>% cbind(coef(out) %>% as.numeric())
+    LASSO_coef <- LASSO_coef %>% as.data.frame()
+    names(LASSO_coef) <- c("var", "coef")
+    LASSO_coef$coef <- LASSO_coef$coef %>% as.character() %>% as.numeric()
+    LASSO_coef$var <- LASSO_coef$var %>% as.character()
+    LASSO_coef$abs_coef <- abs(LASSO_coef$coef)
+    LASSO_coef <-
+      LASSO_coef[order(LASSO_coef$abs_coef, decreasing = TRUE), ]
+    LASSO_vars <- LASSO_coef$var[LASSO_coef$coef != 0 &
+                                   LASSO_coef$var != "(Intercept)"]
+    LASSO_length <- LASSO_vars %>% length()
+    LASSO_names <- LASSO_vars %>% paste(collapse = "  |  ")
+    #Store comparison between Ridge and LASSO
+    if (dta$propertyaddresscity %>% unique() %>% length() == 1) {
+      subsample_name <-
+        paste(
+          dta$situsstatecode %>% unique() %>% as.character() %>% paste(collapse =
+                                                                         "_"),
+          dta$situscounty %>% unique() %>% as.character() %>%
+            paste(collapse = "_"),
+          dta$propertyaddresscity %>% unique() %>% as.character() %>%
+            paste(collapse = "_"),
+          sep = "_"
+        )
+    } else {
+      subsample_name <-
+        paste(
+          dta$situsstatecode %>% unique() %>% as.character() %>% paste(collapse =
+                                                                         "_"),
+          dta$situscounty %>% unique() %>% as.character() %>%
+            paste(collapse = "_")
+        )
+      
+    }
+    comparison <- c(
+      subsample_name,
+      preprocess_retention,
+      nrow(dta),
+      ncol(dta),
+      ridge_MSE,
+      ridge_MPE,
+      ridge_MAPE,
+      LASSO_MSE,
+      LASSO_MPE,
+      LASSO_MAPE,
+      LASSO_length,
+      LASSO_names
+    ) %>% as.data.frame %>% t()
+    colnames(comparison) <- c(
+      "subsample",
+      "preprocess_retention",
+      "obs",
+      "vars",
+      "ridge_MSE",
+      "ridge_MPE",
+      "ridge_MAPE",
+      "LASSO_MSE",
+      "LASSO_MPE",
+      "LASSO_MAPE",
+      "LASSO_length",
+      "LASSO_names"
+    )
+    return(comparison)
+  }
 ```
 
 ---
 ## 6. Build predictive models for individual subgroups
 Assembling the final modeling function combining the previous 2 functions and applicable to large list.
-```{r, echo=TRUE, warning=FALSE}
+```{r}
 #Build function to parse modeling output and realize parameter entry
-modeling<-function(list,
-                   method="regularization",
-                   price_h=5000000,
-                           price_l=100,
-                           yr_st=2012,
-                           sz=1000){
-comparison_set<-NULL
-for (i in 1:length(list)){
-  dta<-list[[i]]
-  dta_preprocessed<-model.preprocess(dta,
-                                     price_high = price_h,
-                                     price_low = price_l,
-                                     start_year = yr_st,
-                                     size = sz)
-  if (method=="tree"){
-    comparison<-model.comparison.tree(dta_preprocessed)
+modeling <- function(list,
+                     method = "regularization",
+                     price_h = 5000000,
+                     price_l = 100,
+                     yr_st = 2012,
+                     sz = 1000) {
+  comparison_set <- NULL
+  for (i in 1:length(list)) {
+    dta <- list[[i]]
+    dta_preprocessed <- model.preprocess(
+      dta,
+      price_high = price_h,
+      price_low = price_l,
+      start_year = yr_st,
+      size = sz
+    )
+    if (method == "tree") {
+      comparison <- model.comparison.tree(dta_preprocessed)
+    }
+    if (method == "regularization") {
+      comparison <- model.comparison.regularization(dta_preprocessed)
+    }
+    comparison_set <- rbind(comparison_set, comparison)
   }
-  if (method=="regularization"){
-    comparison<-model.comparison.regularization(dta_preprocessed)
-  }
-  comparison_set<-rbind(comparison_set,comparison)
-}
-  comparison_set<-cbind(
-    rep(price_h,nrow(comparison_set)),
-    rep(price_l,nrow(comparison_set)),
-    rep(yr_st,nrow(comparison_set)),
-    rep(sz,nrow(comparison_set)),
+  comparison_set <- cbind(
+    rep(price_h, nrow(comparison_set)),
+    rep(price_l, nrow(comparison_set)),
+    rep(yr_st, nrow(comparison_set)),
+    rep(sz, nrow(comparison_set)),
     comparison_set
   )
-  comparison_set<-comparison_set%>%as.data.frame()
-  names(comparison_set)[1:4]<-c("price_high","price_low","year_start","size")
-  comparison_set$preprocess_retention<-comparison_set$preprocess_retention%>%as.character()%>%as.numeric()
-num_vars<-c("obs",
-            "vars",
-            "rf_MSE",
-            "rf_MAPE",
-            "gb_MSE",
-            "gb_MPE",
-            "gb_MAPE",
-            "ridge_MSE",
-            "ridge_MPE",
-            "ridge_MAPE",
-            "LASSO_MSE",
-            "LASSO_MPE",
-            "LASSO_MAPE",
-            "LASSO_length"
-            )
-  for (i in names(comparison_set)){
-    if (i%in%num_vars){
-        comparison_set[[i]]<-comparison_set[[i]]%>%as.character()%>%as.numeric()
-        }
+  comparison_set <- comparison_set %>% as.data.frame()
+  names(comparison_set)[1:4] <-
+    c("price_high", "price_low", "year_start", "size")
+  comparison_set$preprocess_retention <-
+    comparison_set$preprocess_retention %>% as.character() %>% as.numeric()
+  num_vars <- c(
+    "obs",
+    "vars",
+    "rf_MSE",
+    "rf_MAPE",
+    "gb_MSE",
+    "gb_MPE",
+    "gb_MAPE",
+    "ridge_MSE",
+    "ridge_MPE",
+    "ridge_MAPE",
+    "LASSO_MSE",
+    "LASSO_MPE",
+    "LASSO_MAPE",
+    "LASSO_length"
+  )
+  for (i in names(comparison_set)) {
+    if (i %in% num_vars) {
+      comparison_set[[i]] <-
+        comparison_set[[i]] %>% as.character() %>% as.numeric()
     }
+  }
   return(comparison_set)
 }
 ```
@@ -1214,115 +1266,132 @@ num_vars<-c("obs",
 ---
 ## 7. Test between 4 algorithms
 Test in subsample of cities and counties, compare several KPI of models to see which of random forest and gradient boosting does the job better.
-```{r, eval=FALSE, echo=TRUE, warning=FALSE}
-model_city_tree<-modeling(home_city_cleaned_dta,"tree",sz=300)
-model_city_regularization<-modeling(home_city_cleaned_dta,"regularization",sz=10000)
-model_summary<-inner_join(model_city_tree,
-                          model_city_regularization%>%select(subsample,
-                                                             ridge_MSE:LASSO_names))
-save(model_summary,file = "D:/Langyi/model_summary.RData")
+```{r, eval=FALSE}
+model_city_tree <- modeling(home_city_cleaned_dta, "tree", sz = 300)
+model_city_regularization <-
+  modeling(home_city_cleaned_dta, "regularization", sz = 10000)
+model_summary <- inner_join(
+  model_city_tree,
+  model_city_regularization %>% select(subsample,
+                                       ridge_MSE:LASSO_names)
+)
+save(model_summary, file = "dta_processed/model_summary.RData")
 ```
 
 ---
 ## 7.5 Visualize model performance
-```{r, echo=TRUE, warning=FALSE}
-load("D:/Langyi/citylevel_fullsample_tree_regularization.RData")
-city_stats<-home_dta%>%group_by(propertyaddresscity)%>%summarise(num=n(),
-                                                                 subsample=str_c(situsstatecode[1],
-                                                                                 situscounty[1],
-                                                                                      propertyaddresscity[1],
-                                                                                      sep ="_"),
-                                                price=median(deedlastsaleprice,na.rm=TRUE),
-                                                area=median(areabuilding,na.rm=TRUE),
-                                                averageprice=median(deedlastsaleprice/areabuilding,na.rm=TRUE),
-                                                builtyear=median(yearbuilt,na.rm=TRUE),
-                                                dist_coast=mean(dist_coast,na.rm=TRUE),
-                                                floodrisk=mean(mdkt32,na.rm=TRUE)
-                                                )
-major_models<-city_stats%>%inner_join(model_summary,by= "subsample")
-major_models$rf_MPE<-major_models$rf_MPE%>%as.character()%>%as.numeric()
-med_floodrisk1<-median(major_models$floodrisk,na.rm = TRUE)
-major_models$floodrisk1<-NA
-major_models$floodrisk1[major_models$floodrisk==0]<-"no flood risk"
-major_models$floodrisk1[major_models$floodrisk>0&
-                          major_models$floodrisk<=med_floodrisk1]<-"low flood risk"
-major_models$floodrisk1[major_models$floodrisk>med_floodrisk1]<-"high flood risk"
+```{r}
+load("dta_processed/model_summary.RData")
+city_stats <-
+  home_dta %>% group_by(propertyaddresscity) %>% summarise(
+    num = n(),
+    subsample =
+      str_c(situsstatecode[1],
+            situscounty[1],
+            propertyaddresscity[1],
+            sep = "_"),
+    price = median(deedlastsaleprice, na.rm = TRUE),
+    area = median(areabuilding, na.rm = TRUE),
+    averageprice = median(deedlastsaleprice / areabuilding, na.rm = TRUE),
+    builtyear = median(yearbuilt, na.rm = TRUE),
+    dist_coast = mean(dist_coast, na.rm = TRUE),
+    floodrisk = mean(mdkt32, na.rm = TRUE)
+  )
+major_models <- city_stats %>% inner_join(model_summary, by = "subsample")
+major_models$rf_MPE <-
+  major_models$rf_MPE %>% as.character() %>% as.numeric()
+med_floodrisk1 <- median(major_models$floodrisk, na.rm = TRUE)
+major_models$floodrisk1 <- NA
+major_models$floodrisk1[major_models$floodrisk == 0] <- "no flood risk"
+major_models$floodrisk1[major_models$floodrisk > 0 &
+                          major_models$floodrisk <= med_floodrisk1] <-
+  "low flood risk"
+major_models$floodrisk1[major_models$floodrisk > med_floodrisk1] <-
+  "high flood risk"
 #save(major_models,file = "D:/Langyi/graph_data/major_models.RData")
 ```
 
+```{r}
+data.table::data.table(major_models)
+```
 
-```{r, echo=TRUE, warning=FALSE}
+---
+## 7.5 Visualize model performance
+```{r}
 ggplot(major_models,
-       aes(x = price,
-           y = floodrisk,
-           color = floodrisk1,
-           size= num,
-           shape=rf_1st)) +
-  geom_point()+
-  geom_jitter()+
+       aes(
+         x = price,
+         y = floodrisk,
+         color = floodrisk1,
+         size = num,
+         shape = rf_1st
+       )) +
+  geom_point() +
+  geom_jitter() +
+  scale_size(guide = "none")+
   scale_color_brewer(palette = "OrRd",
-                     direction = -1)+
-  scale_x_continuous(name="Average property value ($)", 
-                     breaks=seq(0,2000000,by=200000))+
-  scale_y_continuous(name="Level of flood risk")+
-  geom_text(data=major_models[major_models$rf_MPE<0.3&
-                                major_models$floodrisk>0.03,],
-            aes(label=propertyaddresscity),
-            color="black",
-            size=2.5, hjust=-0.3, vjust=-0.3)+
+                     direction = -1) +
+  scale_x_continuous(name = "Average property value ($)",
+                     breaks = seq(0, 2000000, by = 200000)) +
+  scale_y_continuous(name = "Level of flood risk") +
+  geom_text(
+    data = major_models%>%filter(rf_MPE < 0.3,
+                                 floodrisk > 0.03),
+    aes(label = propertyaddresscity),
+    color = "black",
+    size = 2.5,
+    hjust = -0.3,
+    vjust = -0.3
+  ) +
   ggtitle("Primary factor of property value in cities",
-          subtitle = "Cities with high flood risk and high prediction accuracy (within 30%) annotated")+
-  labs(caption = "Source: ATTOM Data Solutions")+
-  theme_classic()+
-  theme(axis.text.x=element_text(angle=30, hjust=1))
+          subtitle = "Cities with high flood risk and high prediction accuracy (within 30%) annotated") +
+  labs(caption = "Source: ATTOM Data Solutions") +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
 ```
 
 
 ---
 ## 8. Personalize filtering parameters for random forest
 Build plotting function. We want to see if we can control what data we put in, how to do so can help us get best results.
-```{r, echo=TRUE, warning=FALSE}
+```{r}
 #Build function to plot series of error for a given tuning parameter
-error.plot<-function(dta=error_matrix){
-retention<-ggplot(data=dta)+
-  geom_line(aes(x = Parameter,
-                y = Retention),
-            color = "tomato1"
-           )+
-  xlab("Parameter values")+
-  theme(legend.position = "left")+
-  theme_classic()
-mse<-ggplot(data=dta)+
-  geom_line(aes(x = Parameter,
-                y = MSE),
-            color = "tomato2"
-           )+
-  xlab("Parameter values")+
-  theme(legend.position = "left")+
-  theme_classic()
-mpe<-ggplot(data=dta)+
-  geom_line(aes(x = Parameter,
-                y = MPE),
-            color = "tomato3"
-           )+
-  xlab("Parameter values")+
-  theme(legend.position = "left")+
-  theme_classic()
-mape<-ggplot(data=dta)+
-  geom_line(aes(x = Parameter,
-                y = MAPE),
-            color = "tomato4"
-           )+
-  xlab("Parameter values")+
-  theme(legend.position = "left")+
-  theme_classic()
-grid.arrange(retention,mse,mape,mpe)
+error.plot <- function(dta = error_matrix) {
+  retention <- ggplot(data = dta) +
+    geom_line(aes(x = Parameter,
+                  y = Retention),
+              color = "tomato1") +
+    xlab("Parameter values") +
+    theme(legend.position = "left") +
+    theme_classic()
+  mse <- ggplot(data = dta) +
+    geom_line(aes(x = Parameter,
+                  y = MSE),
+              color = "tomato2") +
+    xlab("Parameter values") +
+    theme(legend.position = "left") +
+    theme_classic()
+  mpe <- ggplot(data = dta) +
+    geom_line(aes(x = Parameter,
+                  y = MPE),
+              color = "tomato3") +
+    xlab("Parameter values") +
+    theme(legend.position = "left") +
+    theme_classic()
+  mape <- ggplot(data = dta) +
+    geom_line(aes(x = Parameter,
+                  y = MAPE),
+              color = "tomato4") +
+    xlab("Parameter values") +
+    theme(legend.position = "left") +
+    theme_classic()
+  grid.arrange(retention, mse, mape, mpe)
 }
 ```
 ---
 ## 8. Personalize filtering parameters for random forest
 Error performance for maximum observation within each model. 
-```{r, eval=FALSE, echo=TRUE, warning=FALSE}
+```{r, eval=FALSE}
 error_matrix<-NULL
 for (i in seq(100,1000,by=100)){
 output<-modeling(home_county_cleaned_dta,
@@ -1341,11 +1410,13 @@ error_matrix<-rbind(error_matrix,error_performance)
 }
 colnames(error_matrix)<-c("Parameter","Retention","MSE","MPE","MAPE")
 error_matrix<-error_matrix%>%as.data.frame()
+save(error_matrix,file = "dta_processed/sz.RData")
 ```
 ---
 ## 8. Personalize filtering parameters for random forest
 This one looks at maximum size of sample in each model. Overall, a larger sample size does help to improve prediction. If not because of computation power constraint, a larger sample should've been used.
-```{r, eval=FALSE,echo=TRUE, warning=FALSE}
+```{r}
+load("dta_processed/sz.RData")
 error.plot(error_matrix)
 ```
 
@@ -1353,7 +1424,7 @@ error.plot(error_matrix)
 ## 8. Personalize filtering parameters for random forest
 Error performance for lowest price acceptable for property
 
-```{r, eval=FALSE,echo=TRUE, warning=FALSE}
+```{r, eval=FALSE}
 error_matrix<-NULL
 for (i in c(100,200,300,500,700,1000,3000,5000,7000,10000)){
 output<-modeling(home_county_cleaned_dta,
@@ -1372,18 +1443,20 @@ error_matrix<-rbind(error_matrix,error_performance)
 }
 colnames(error_matrix)<-c("Parameter","Retention","MSE","MPE","MAPE")
 error_matrix<-error_matrix%>%as.data.frame()
+save(error_matrix,file = "dta_processed/price_l.RData")
 ```
 ---
 ## 8. Personalize filtering parameters for random forest
 This one looks at lowest price acceptable for property. We can see there's a tradeoff between having better prediction and having less data.
-```{r, eval=FALSE,echo=TRUE, warning=FALSE}
+```{r}
+load("dta_processed/price_l.RData")
 error.plot(error_matrix)
 ```
 
 ---
 ## 8. Personalize filtering parameters for random forest
 Error performance for starting year to filter the properties
-```{r, eval=FALSE,echo=TRUE, warning=FALSE}
+```{r, eval=FALSE}
 error_matrix<-NULL
 for (i in c(2000,2004,2007,2010,2012,2014,2015,2016,2017)){
 output<-modeling(home_county_cleaned_dta,
@@ -1402,17 +1475,20 @@ error_matrix<-rbind(error_matrix,error_performance)
 }
 colnames(error_matrix)<-c("Parameter","Retention","MSE","MPE","MAPE")
 error_matrix<-error_matrix%>%as.data.frame()
+save(error_matrix,file = "dta_processed/yr_st.RData")
 ```
 ---
 ## 8. Personalize filtering parameters for random forest
 This one looks at starting year to filter the properties. It seems constraining to certain recent year may help, but we want to further figure out what's its impact on the sample size.
-```{r,eval=FALSE, echo=TRUE, warning=FALSE}
+```{r}
+load("dta_processed/yr_st.RData")
 error.plot(error_matrix)
 ```
+
 ---
 ## 8. Personalize filtering parameters for random forest
 Error performance for highest price acceptable for properties. 
-```{r, eval=FALSE,echo=TRUE, warning=FALSE}
+```{r, eval=FALSE}
 error_matrix<-NULL
 for (i in c(100000,300000,500000,700000,1000000,3000000,5000000,7000000,10000000)){
 output<-modeling(home_county_cleaned_dta,
@@ -1431,12 +1507,14 @@ error_matrix<-rbind(error_matrix,error_performance)
 }
 colnames(error_matrix)<-c("Parameter","Retention","MSE","MPE","MAPE")
 error_matrix<-error_matrix%>%as.data.frame()
+save(error_matrix,file = "dta_processed/price_h.RData")
 ```
 
 ---
 ## 8. Personalize filtering parameters for random forest
 This one looks at highest price acceptable for properties It seems 
-```{r, eval=FALSE,echo=TRUE, warning=FALSE}
+```{r}
+load("dta_processed/price_h.RData")
 error.plot(error_matrix)
 ```
 
@@ -1465,12 +1543,7 @@ add tract block medium price as control
 
 Can try tuning the filtering parameter for each model
 
-chunk: overflow-y
-
 xgboost
 log scale price
 recode zip code to dummy (one-hot recoding)
 cities can use superzip as example
-
----
-## Thank you for taking time to check the slides.
