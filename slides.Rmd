@@ -1,28 +1,19 @@
 ---
 title: "Estimating Costal Property Values in Florida"
 author: "Langyi Tian"
-output: html_document: default
-      
+output: 
+  xaringan::moon_reader:
+    css: ["default", "rutgers-fonts", "duke-blue"]
+    lib_dir: libs
+    nature:
+      ratio: 16:9
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
 ---
 exclude: true
 
-class: left, top
-background-image: url(images/roadmap.png)
-background-size: 100%
-background-position: 50% 280%
-
-```{r}
-#place for different output choice
-#  xaringan::moon_reader:
-#    css: ["default", "default-fonts", "custom_Xaringan.css"]
-#    lib_dir: libs
-#    nature:
-#      highlightStyle: github
-#      highlightLines: true
-#      countIncrementalSlides: false
-```
-
-```{r packages}
+```{r packages, include=FALSE}
 # Load packages.
 packages <- c("tidyr", 
               "dplyr",
@@ -51,12 +42,10 @@ packages <- lapply(packages, FUN = function(x) {
 ```{r setup}
 library("knitr")
 knitr::opts_chunk$set(
-  echo = TRUE,
+  echo = FALSE,
   eval = TRUE,
   message = FALSE,
   warning = FALSE,
-  figure.height = 7,
-  figure.width = 15,
   figure.align = "center",
   cache = TRUE,
   cache.lazy = FALSE
@@ -65,32 +54,25 @@ knitr::opts_chunk$set(
 options(htmltools.dir.version = FALSE)
 ```  
 
-```{r theme-map}
-theme_simplemap <- function(base_size = 9, base_family = "") {
+```{r theme-map, include=FALSE}
+theme_simplemap <- function(base_size = 9,
+                            base_family = "") {
   theme_bw(base_size = base_size, base_family = base_family) %+replace%
-    theme(axis.line = element_blank(),
-          axis.text = element_blank(),
-          axis.ticks = element_blank(),
-          axis.title = element_blank(),
-          panel.background = element_blank(),
-          panel.border = element_blank(),
-          panel.grid = element_blank(),
-          panel.spacing = unit(0, "lines"),
-          plot.background = element_blank(),
-          legend.position = "none")
+    theme(
+      axis.line = element_blank(),
+      axis.text = element_blank(),
+      axis.ticks = element_blank(),
+      axis.title = element_blank(),
+      panel.background = element_blank(),
+      panel.border = element_blank(),
+      panel.grid = element_blank(),
+      panel.spacing = unit(0, "lines"),
+      plot.background = element_blank(),
+      legend.position = "none"
+    )
 }
 ``` 
 
-##Simple AB Test
-You own a vacation house in Florida. One day you are surprised to find its market value drops. Two explanations in seperate ways.
-
- - "Your home suffers from high risk from frequent tidal flooding."
- - "Your home would have worth $751,176, now it only worth $736,230 due to frequent tidal flooding."
- 
-Which one seems more convincing?
-
---
-![website sample](floodiq_sample.png)
 ---
 ## Executive summary
 Objective
@@ -100,31 +82,36 @@ Objective
 Data
  - Administrative property records (3 million), transaction records from ATTOM Data Solutions
  - Demographic data from census data
- - Flooding projections and other climate data from National Oceanic and Atmospheric Administration (NOAA) 
+ - Flooding projections from National Oceanic and Atmospheric Administration (NOAA) 
  
 Methodology
- - Build seperate models within each city and county to account for geographical variation and improve data quality
+ - Build seperate models within each city and county 
  - Regularization models (Ridge, LASSO) as baseline
- - Regression trees ry random forest and gradient boosting as comparison for trial models
+ - Regression trees e.g. random forest and gradient boosting as comparison for trial models
 
 Findings
  - Trees work better than baseline
- - Random forest algorithm consistently outperform gradient boosting
+ - Random forest algorithm consistently outperformed by gradient boosting
  - City-level models have varying performance
  - Ability to predict within 10% deviation in some cities
- - Key filtering parameters should be optimized to improve prediction
- - Transaction time and building area are 2 primary factors of property value
  
 ---
 ## Project roadmap
 
 1. Data preparation
+
 2. Exploratory analysis
+
 3. Seperate modeling: one model for each city/county data
+
 4. Feature selection with individual models
+
 5. Build seperate predictive models for 85 city-level subsamples
+
 6. Functionalities to test and parse out performance metrics for regularized models and regression trees
+
 7. Personalize data filtering parameters
+
 8. Iteration through cities/counties and view corss-validated model performance, map county-level model performance
 
 ---
@@ -134,41 +121,32 @@ Select features from property records in a real estate broker's database.
 #Input original dataset 1: property data
 home_dta_original<-fread("raw_data/SF_Home_Characteristics.csv")
 save(home_dta_original, file = "dta_processed/SF_Taxassessor_original.RData")
+```
+
+```{r, eval=FALSE, echo=TRUE}
 #Select features to import, subset and save
 home_dta <- select(
   home_dta_original,
-  attomid,
-  #Matching ID
-  deedlastsaleprice,
-  #Transaction price last sale
-  situsstatecode,
-  #State code
-  situscounty,
-  #County code
-  propertyaddresscity,
-  #City code
-  ownertypedescription1,
-  #First owner is individual/company?
-  ownertypedescription2,
-  #Second owner is individual/company?
-  deedlastsaledate,
-  #Date of market sale
-  yearbuilt,
-  #Year when built
-  propertyusegroup,
-  #Commercial/residential?
-  areabuilding,
-  #Living area in sq.feet
-  censustract,
-  #Census tract division
-  propertylatitude,
-  #Lat of property
-  propertylongitude,
-  #Lon of property
-  roomsatticflag,
-  #See below
+  attomid,#Matching ID
+  deedlastsaleprice,#Transaction price last sale
+  situsstatecode,#State code
+  situscounty,#County code
+  propertyaddresscity,#City code
+  ownertypedescription1,#First owner is individual/company?
+  ownertypedescription2,#Second owner is individual/company?
+  deedlastsaledate,#Date of market sale
+  yearbuilt,#Year when built
+  propertyusegroup,#Commercial/residential?
+  areabuilding,#Living area in sq.feet
+  censustract,#Census tract division
+  propertylatitude,#Lat of property
+  propertylongitude,#Lon of property
+  roomsatticflag,#See below
   parkinggarage:communityrecroomflag#A series variable measuring physical attributes of the property, including rooms count and relevant facilities
 )
+```
+
+```{r, eval=FALSE}
 save(home_dta, file = "dta_processed/SF_Taxassessor_reduced.RData")
 ```
 
@@ -180,23 +158,34 @@ Select features from environmental risk and demographic data set constructed by 
 risk_dta_original <-
   fread("raw_data/SF_Parcel_Risk_and_Spatial_Data.csv")
 save(risk_dta_original, file = "dta_processed/SF_Parcel_Risk_and_Spatial_Data_original.RData")
-risk_dta <- risk_dta_original %>% select(attomid = ATTOM_ID,#ID
-                                         dist_coast,#Distance to coast
-                                         mdkt32,#Flooding probability estimate in next years
-                                         Totpopbg:near_reading_rates,)#a set of demographic information varying by census tract 
+```
+
+```{r, eval=FALSE, echo=TRUE}
+risk_dta <-
+  risk_dta_original %>% select(attomid = ATTOM_ID, #ID
+                               dist_coast, #Distance to coast
+                               mdkt32, #Flooding probability estimate in next years
+                               Totpopbg:near_reading_rates, )#a set of demographic information varying by census tract
+```
+
+```{r, eval=FALSE}
 save(risk_dta, file = "dta_processed/SF_Parcel_Risk_and_Spatial_Data_reduced.RData")
 ```
 
----
-## 1. Data preparation
 Get a simple feature of transaction frequence from transaction records
 ```{r, eval=FALSE}
 #Import dataset 3: property transactions, subset and save
 trans_dta_original <-
   fread("raw_data/SF_Sales_Transactions_Data.csv")
 save(trans_dta_original, file = "dta_processed/SF_Sales_Transactions_Data_original.RData")
+```
+
+```{r, eval=FALSE, echo=TRUE}
 trans_dta <-
-  trans_dta_original %>% group_by(attomid) %>% summarize(trans_times = n())
+  trans_dta_original %>% group_by(attomid) %>% summarize(trans_times = n())#Number of transactions
+```
+
+```{r, eval=FALSE}
 save(trans_dta, file = "dta_processed/SF_Sales_Transactions_Data_reduced.RData")
 ```
 
@@ -223,8 +212,8 @@ home_dta_ver1 %>% report.dim()
 
 ---
 ## 1. Data preparation
-Recoding and transforming features
 ```{r}
+# - Recoding and transforming features
 #This chunk of recoding is not supposed to change data dimension
 #Fill in the price variable so that it will not be dropped later
 home_dta$deedlastsaleprice[is.na(home_dta$deedlastsaleprice) == "TRUE"] <- 0
@@ -242,9 +231,6 @@ home_dta$ownertypedescription2[home_dta$ownertypedescription2 %in% c ("NP", "UNK
                                  is.na(home_dta$ownertypedescription2) == TRUE] <- 0
 ```
 
----
-## 1. Data preparation
-Recoding and transforming features (cont'd)
 ```{r}
 #Recoding property usage group
 home_dta$propertyusegroup[home_dta$propertyusegroup%in% c ("NP", "UNKNOWN", "") |
@@ -255,9 +241,7 @@ home_dta$propertyusegroup[home_dta$propertyusegroup%in% c ("NP", "UNKNOWN", "") 
 home_dta$areabuilding[home_dta$areabuilding<50]<-NA
 ```
 
----
-## 1. Data preparation
-Drop all unary features
+ - Drop all unary features
 ```{r}
 #Drop unary variables in dataset
 drop.unary <- function(dta) {
@@ -275,9 +259,7 @@ home_dta_ver1.5 <- home_dta
 home_dta_ver1.5 %>% report.dim()
 ```
 
----
-##1. Data preparation
-Recoding and transforming features (cont'd)
+ - Drop variables with too many levels, besides those are numerical
 ```{r}
 #Drop variables with too many levels, besides those are numerical
 for (i in names(home_dta)[which(names(home_dta) == "parkinggarage"):which(names(home_dta) ==
@@ -294,10 +276,7 @@ for (i in names(home_dta)[which(names(home_dta) == "parkinggarage"):which(names(
 home_dta_ver2 <- home_dta
 home_dta_ver2 %>% report.dim()
 ```
-
----
-##1. Data preparation
-Recoding and transforming features (cont'd)
+ 
 ```{r}
 #Give value 0 for NAs in less improtant variables so the obs will not be deleted
 for (i in names(home_dta)[-1:-14]) {
@@ -306,10 +285,8 @@ for (i in names(home_dta)[-1:-14]) {
                   home_dta[[i]] == "NA"] <- 0
 }
 ```
-
----
-## 1. Data preparation
-Recoding and transforming features (cont'd)
+ 
+ - Recoded characters to factors
 ```{r}
 #Recoded characters to factors.
 cat("These variables are recoded to factors")
@@ -321,9 +298,6 @@ for (i in names(home_dta)) {
 }
 ```
 
----
-
-## 1. Data preparation
 ```{r}
 #Get a list of large cities sufficient for consideration
 city_obs <-
@@ -331,9 +305,7 @@ city_obs <-
 names(city_obs) <- c("propertyaddresscity", "Properties")
 ```
 
----
-## 1. Data preparation
-Hold out cities with sample size too small to go into tree model.
+ - Hold out cities with sample size too small to go into tree model.
 ```{r}
 #For obtaining sufficient number of obs in each model, we drop cities with <5000 obs.
 city_obs <- city_obs %>% filter(propertyaddresscity != "",
@@ -344,9 +316,13 @@ home_dta <- home_dta_less_city
 #Store a stage version of data here
 home_dta_ver3 <- home_dta_less_city
 home_dta_ver3 %>% report.dim()
+save(home_dta,file = "dta_processed/home_dta.RData")
+load("dta_processed/home_dta.RData")
 ```
 
 ---
+exclude: true
+
 ## 2. Exploratory analysis
 Plot summary graph of a few important variables to understand their overall statistical distribution
 ```{r}
@@ -377,7 +353,6 @@ summary.variable <- function(varname = "deedlastsaleprice",
   return(m)
 }
 ```
-
 
 ```{r, eval=FALSE}
 #Explorative function to plot summary statistics for a set of variables
@@ -414,8 +389,9 @@ grid_plot(1)
 
 ---
 ## 2. Exploratory analysis
-Summarize a few key variables by county to see the geographical variation
-```{r}
+
+ - Summarize a few key variables by county to see the geographical variation
+```{r,include=FALSE}
 #Import shape file and save to rdata to reduce loading time
 parcel <-
   readOGR(dsn = "raw_data/tl_2017_us_county", layer = "tl_2017_us_county")
@@ -444,9 +420,7 @@ names(county_summary)[1] <- c("NAME")
 parcel@data <- inner_join(parcel@data, county_summary, by = "NAME")
 save(parcel, file = "graph_data/parcel.RData")
 ```
-
----
-## 2. Exploratory analysis
+ 
 ```{r}
 #Plot statistics by county
 options(scipen = 10)
@@ -491,9 +465,7 @@ by_year_county <-
   )
 #save(by_year_county,file = "graph_data/by_year_county.RData")
 ```
-
----
-## 2. Exploratory analysis
+ 
 ```{r}
 ggplot(by_year_county[by_year_county$deedlastsaledate > 1955 &
                         by_year_county$deedlastsaledate < 2019 &
@@ -517,8 +489,6 @@ ggplot(by_year_county[by_year_county$deedlastsaledate > 1955 &
   theme(axis.text.x = element_text(angle = 30, hjust = 1))
 ```
 
-add transaction num by year
-
 ---
 ## 2. Exploratory analysis
 ```{r}
@@ -538,8 +508,7 @@ by_year_use <-
 #save(by_year_use,file = "D:/Langyi/graph_data/by_year_use.RData")
 ```
 
----
-## 2. Exploratory analysis
+
 ```{r}
 ggplot(by_year_use%>%filter(deedlastsaledate %in%c(1955:2019)),
        aes(x = deedlastsaledate,
@@ -557,7 +526,6 @@ ggplot(by_year_use%>%filter(deedlastsaledate %in%c(1955:2019)),
   theme_classic() +
   theme(axis.text.x = element_text(angle = 30, hjust = 1))
 ```
-
 
 ---
 ## 2. Exploratory analysis
@@ -577,9 +545,7 @@ by_year_own <-
   )
 #save(by_year_own,file = "D:/Langyi/graph_data/by_year_own.RData")
 ```
-
----
-## 2. Exploratory analysis
+ 
 ```{r}
 ggplot(by_year_own%>%filter(deedlastsaledate %in%c(1955:2019)),
        aes(x = deedlastsaledate,
@@ -598,6 +564,8 @@ ggplot(by_year_own%>%filter(deedlastsaledate %in%c(1955:2019)),
   theme(axis.text.x=element_text(angle=30, hjust=1))
 ```
 
+---
+## 2. Exploratory analysis
 ```{r}
 home_dta_flood <- home_dta
 med_dist_coast <- median(home_dta_flood$dist_coast, na.rm = TRUE)
@@ -628,8 +596,6 @@ by_year_floodrisk <-
 #save(by_year_floodrisk,file = "D:/Langyi/graph_data/by_year_floodrisk.RData")
 ```
 
----
-## 2. Exploratory analysis
 ```{r}
 ggplot(
   by_year_floodrisk %>% filter(deedlastsaledate %in% c(1955:2019)),
@@ -650,7 +616,8 @@ ggplot(
   theme(axis.text.x = element_text(angle = 30, hjust = 1))
 ```
 
-
+---
+## 2. Exploratory analysis
 ```{r}
 ggplot(by_year_floodrisk %>% filter(deedlastsaledate %in% c(2000:2019)),
        aes(x = deedlastsaledate,
@@ -718,9 +685,7 @@ by_city_year$floodrisk1[by_city_year$floodrisk>med_floodrisk]<-"high flood risk"
 by_city_year$floodrisk1<-by_city_year$floodrisk1%>%as.character()
 #save(by_city_year,file = "D:/Langyi/graph_data/by_city_year.RData")
 ```
-
----
-## 2. Exploratory analysis
+ 
 ```{r}
 ggplot(by_city,
        aes(x = averagefrequency,
@@ -776,17 +741,16 @@ ggplot(by_city,
 
 ---
 ## 3. Seperate modeling: one model for each city/county data
-This means for every city/county in South Florida, we fit an individual model to it seperately.
+ - For every city/county in South Florida, we fit an individual model to it seperately.
 
-Inspired by the "submarket" idea
- - The housing prices between neibourhoods, cities and counties vary a lot
+ - Inspired by the "submarket" notion (the housing prices between neibourhoods, cities and counties vary a lot)
  
-Feature structure vary by county
+ - Feature structure vary by county
+
  - There are some variables that represent housing attributes that miss in data with different cases between counties.
+
+ - The process for county-level modeling is rather straightforward.
  
----
-## 3. Seperate modeling: one model for each city/county data
-The process for county-level modeling is rather straightforward.
 ```{r}
 home_dta_less_city$propertyaddresscity <-
   home_dta_less_city$propertyaddresscity %>% as.character()
@@ -800,7 +764,7 @@ home_county_dta <-
 
 ---
 ## 4. Feature selection with individual models
-Build function to automatically drop variables that are not important and are missing over 10% values, as we don't wish too many obs are omitted in tree model due to missing value.
+ - Build function to automatically drop variables that are not important and are missing over 10% values, as we don't wish too many obs are omitted in tree model due to missing value.
 ```{r}
 #Function to determine whether a variable is missing less than 10% values
 is.missing <- function(var, ratio = 0.1) {
@@ -829,9 +793,7 @@ drop.missing <- function(dta) {
 }
 ```
 
----
-## 4. Feature selection with individual models
-Apply the selection functions built just now to all subsamples
+ - Apply the selection functions built just now to all subsamples
 ```{r}
 #Apply to city the function in previous function for feature selection
 home_city_cleaned_dta <- purrr::map(home_city_dta, drop.missing)
@@ -840,9 +802,22 @@ home_city_cleaned_dta <- purrr::map(home_city_cleaned_dta, drop.unary)
 home_county_cleaned_dta <- purrr::map(home_county_dta, drop.missing)
 home_county_cleaned_dta <- purrr::map(home_county_cleaned_dta, drop.unary)
 ```
+
+ - Divided subsamples by county
+```{r, echo=TRUE}
+summary(home_county_cleaned_dta)
+```
 ---
+## 4. Feature selection with individual models
+ - First 5 divided subsamples by city
+```{r, echo=TRUE}
+summary(home_city_cleaned_dta)%>%head()
+```
+
+---
+exclude: true
 ## 5. Interactivity to check individual properties within sample (a playaround...)
-Build the ability to check for key features of individual properties using Google map
+ - Build the ability to check for key features of individual properties using Google map
 ```{r}
 #Provide an interactive leaflet for checking individual properties, Hendry County as an example.
 map.variable<-function(dta=home_county_cleaned_dta$Hendry,
@@ -873,17 +848,21 @@ leaflet(dta) %>%
 } else {print("Variables filtered out in final data, unable to plot map for this subsample")
 }
 }
-```
----
-## 5. Interactivity to check individual properties within sample (a playaround...)
-Build the ability to check for key features of individual properties using Google map
-```{r, eval=FALSE,echo=TRUE, warning=FALSE}
+``` 
+ 
+```{r, eval=FALSE}
 map.variable(dta = home_city_cleaned_dta$AVENTURA)
 ```
 
 ---
 ## 6. Build predictive models for individual subgroups
-Develop functionality for final preprocessing before feeding data into model. Here we want to deal within each model very precisely the control of missing values and division of training/test test. Therefore, the process was distributed to each subsample and run independently.
+###Final Ppreprocessing of individual model before modeling
+ - Develop functionality for final preprocessing before feeding data into model
+
+ - Here we have within each model the control of missing values and division of training/test set
+
+ - Therefore, the wragling process was automized and run in each subsample
+ 
 ```{r}
 #Build final preprocess function
 model.preprocess <- function(dta,
@@ -927,11 +906,16 @@ model.preprocess <- function(dta,
 }
 ```
 
----
-## 6. Build predictive models for individual subgroups
-I decided to use random forest and gradient boosting as the first try. Random forest deal with data with large variations well while boosting is good at learn specific models, so they are a good compensation to each other. In addition, tree algorithms always return variable importance, which is useful for subsequent model selection.
-
-Here a model comparison with output from random forest and gradient boosting is built. It will generate several attributes of the model as well as some key performance index of the 2 tree algorithms.
+###Modeling functionalities
+ - Regularization (Ridge and LASSO) as baseline, try also trees
+ 
+ - Random forest deal with data with large variations well
+ 
+ - Gradient boosting is good at learn specific models 
+ 
+ - A model comparison with output from random forest and gradient boosting (also Ridge and LASSO)
+ 
+ - The function will parse validated key performance metrics and variables of importance of the models
 
 ```{r}
 model.comparison.tree <-
@@ -957,7 +941,7 @@ model.comparison.tree <-
     rf_highvars <- rf_summary[order(rf_summary$`%IncMSE`,
                                     decreasing = TRUE),] %>% head(5) %>% row.names()
     if (length(rf_highvars) < 5) {
-      rf_highvars <- c(rf_highvars, rep(NA, (5 - length(rf_highvars))))
+      rf_highvars <- c(rf_highvars, rep("N/A", (5 - length(rf_highvars))))
     }
     #Test set
     yhat.rf <- predict(train_rf, test)
@@ -978,7 +962,7 @@ model.comparison.tree <-
                                     decreasing = TRUE),] %>% head(5) %>% row.names()
     if (length(gb_highvars) < 5) {
       add <- 5 - length(gb_highvars)
-      gb_highvars <- c(gb_highvars, rep(NA, add))
+      gb_highvars <- c(gb_highvars, rep("N/A", add))
     }
     #Test set
     yhat.gb <- predict(train_gb, test, n.trees = 1000)
@@ -993,12 +977,9 @@ model.comparison.tree <-
     if (dta$propertyaddresscity %>% unique() %>% length() == 1) {
       subsample_name <-
         paste(
-          dta$situsstatecode %>% unique() %>% as.character() %>% paste(collapse =
-                                                                         "_"),
-          dta$situscounty %>% unique() %>% as.character() %>%
-            paste(collapse = "_"),
-          dta$propertyaddresscity %>% unique() %>% as.character() %>%
-            paste(collapse = "_"),
+          dta$situsstatecode %>% unique() %>% as.character() %>% paste(collapse = "_"),
+          dta$situscounty %>% unique() %>% as.character() %>% paste(collapse = "_"),
+          dta$propertyaddresscity %>% unique() %>% as.character() %>% paste(collapse = "_"),
           sep = "_"
         )
     } else {
@@ -1195,11 +1176,10 @@ model.comparison.regularization <-
     return(comparison)
   }
 ```
-
----
-## 6. Build predictive models for individual subgroups
-Assembling the final modeling function combining the previous 2 functions and applicable to large list.
+ 
 ```{r}
+#Assembling the final modeling function combining the previous 2 functions
+#The function is applicable to large list.
 #Build function to parse modeling output and realize parameter entry
 modeling <- function(list,
                      method = "regularization",
@@ -1259,13 +1239,15 @@ modeling <- function(list,
         comparison_set[[i]] %>% as.character() %>% as.numeric()
     }
   }
+  comparison_set<-comparison_set%>%as.data.frame()
   return(comparison_set)
 }
 ```
 
 ---
+exclude: true
 ## 7. Test between 4 algorithms
-Test in subsample of cities and counties, compare several KPI of models to see which of random forest and gradient boosting does the job better.
+Test the model in subsample of cities and counties, compare several KPI of models to see which of random forest and gradient boosting does the job better.
 ```{r, eval=FALSE}
 model_city_tree <- modeling(home_city_cleaned_dta, "tree", sz = 300)
 model_city_regularization <-
@@ -1274,12 +1256,12 @@ model_summary <- inner_join(
   model_city_tree,
   model_city_regularization %>% select(subsample,
                                        ridge_MSE:LASSO_names)
-)
+) 
 save(model_summary, file = "dta_processed/model_summary.RData")
 ```
 
 ---
-## 7.5 Visualize model performance
+## 7 Visualize model performance
 ```{r}
 load("dta_processed/model_summary.RData")
 city_stats <-
@@ -1312,7 +1294,73 @@ major_models$floodrisk1[major_models$floodrisk > med_floodrisk1] <-
 ```
 
 ```{r}
-data.table::data.table(major_models)
+dta<-major_models%>%filter(gb_MAPE<1,rf_MAPE<1)
+ggplot(dta)+
+  geom_point(aes(x=propertyaddresscity[order(dta$rf_MAPE)],
+                 y=rf_MAPE,
+                 color="chartreuse"))+
+  geom_point(aes(x=propertyaddresscity[order(dta$rf_MAPE)],
+                 y=gb_MAPE,
+                 color="aquamarine2"))+
+  ggtitle("Random forest mostly outperform gradient boosting",
+          subtitle = "Showing models with MAPE < 1, gradient boosting in blue") +
+  xlab("City-level subsamples") + 
+  ylab("MAPE")+
+  labs(caption = "Source: ATTOM Data Solutions",
+       fill = "Model") +
+  theme_classic() +
+  theme(axis.text.x=element_blank(),
+        legend.position = "none")
+```
+
+---
+## 7 Visualize model performance
+```{r}
+dta<-major_models%>%filter(ridge_MAPE<1,LASSO_MAPE<1)
+ggplot(dta)+
+  geom_point(aes(x=propertyaddresscity[order(dta$rf_MAPE)],
+                 y=LASSO_MAPE,
+                 color="chartreuse"))+
+  geom_point(aes(x=propertyaddresscity[order(dta$rf_MAPE)],
+                 y=ridge_MAPE,
+                 color="aquamarine2"))+
+  ggtitle("Ridge and LASSO have similar performance",
+          subtitle = "Showing models with MAPE < 1, ridge in blue") +
+  xlab("City-level subsamples") + 
+  ylab("MAPE")+
+  labs(caption = "Source: ATTOM Data Solutions",
+       fill = "Model") +
+  theme_classic() +
+  theme(axis.text.x=element_blank(),
+        legend.position = "none")
+```
+
+---
+## 7 Visualize model performance
+```{r}
+dta<-major_models%>%filter(ridge_MAPE<1,gb_MAPE<1)
+ggplot(dta)+
+  geom_point(aes(x=propertyaddresscity[order(dta$rf_MAPE)],
+                 y=gb_MAPE,
+                 color="chartreuse"))+
+  geom_point(aes(x=propertyaddresscity[order(dta$rf_MAPE)],
+                 y=ridge_MAPE,
+                 color="aquamarine2"))+
+  ggtitle("Disparity exists for comparison of Ridge and GBM performance",
+          subtitle = "Showing models with MAPE < 1, ridge in blue") +
+  xlab("City-level subsamples") + 
+  ylab("MAPE")+
+  labs(caption = "Source: ATTOM Data Solutions",
+       fill = "Model") +
+  theme_classic() +
+  theme(axis.text.x=element_blank(),
+        legend.position = "none")
+```
+
+---
+## 7 Visualize model performance
+```{r}
+major_models%>%select(-LASSO_names)%>%DT::datatable()
 ```
 
 ---
@@ -1353,36 +1401,43 @@ ggplot(major_models,
 
 ---
 ## 8. Personalize filtering parameters for random forest
-Build plotting function. We want to see if we can control what data we put in, how to do so can help us get best results.
+ - Filtering rule decides whether to include properties with extremely low/high price
+ - Cruicial to model performance
+ - Build functionalities to show model performance depending on filtering parameters
 ```{r}
 #Build function to plot series of error for a given tuning parameter
-error.plot <- function(dta = error_matrix) {
+error.plot <- function(dta = error_matrix,
+                       title = "Parameter values") {
   retention <- ggplot(data = dta) +
-    geom_line(aes(x = Parameter,
+    geom_line(aes(x = Parameter*100,
                   y = Retention),
-              color = "tomato1") +
-    xlab("Parameter values") +
+              color = "tomato4") +
+    xlab(title) +
+    ylab("% of obs kept") + 
     theme(legend.position = "left") +
     theme_classic()
   mse <- ggplot(data = dta) +
     geom_line(aes(x = Parameter,
                   y = MSE),
-              color = "tomato2") +
-    xlab("Parameter values") +
+              color = "tomato4") +
+    xlab(title) +
+    ylab("MSE") + 
     theme(legend.position = "left") +
     theme_classic()
   mpe <- ggplot(data = dta) +
-    geom_line(aes(x = Parameter,
+    geom_line(aes(x = Parameter*100,
                   y = MPE),
-              color = "tomato3") +
-    xlab("Parameter values") +
+              color = "tomato4") +
+    xlab(title) +
+    ylab("MPE %") + 
     theme(legend.position = "left") +
     theme_classic()
   mape <- ggplot(data = dta) +
-    geom_line(aes(x = Parameter,
+    geom_line(aes(x = Parameter*100,
                   y = MAPE),
               color = "tomato4") +
-    xlab("Parameter values") +
+    xlab(title) +
+    ylab("MAPE %") + 
     theme(legend.position = "left") +
     theme_classic()
   grid.arrange(retention, mse, mape, mpe)
@@ -1390,10 +1445,9 @@ error.plot <- function(dta = error_matrix) {
 ```
 ---
 ## 8. Personalize filtering parameters for random forest
-Error performance for maximum observation within each model. 
-```{r}
+```{r, eval=FALSE}
 error_matrix<-NULL
-for (i in seq(100,10000,200)){
+for (i in seq(100,1000,100)){
 output<-modeling(home_county_cleaned_dta,
                  method="tree",
                       price_h=5000000,
@@ -1412,21 +1466,17 @@ colnames(error_matrix)<-c("Parameter","Retention","MSE","MPE","MAPE")
 error_matrix<-error_matrix%>%as.data.frame()
 save(error_matrix,file = "dta_processed/sz.RData")
 ```
----
-## 8. Personalize filtering parameters for random forest
-This one looks at maximum size of sample in each model. Overall, a larger sample size does help to improve prediction. If not because of computation power constraint, a larger sample should've been used.
+ 
 ```{r}
 load("dta_processed/sz.RData")
-error.plot(error_matrix)
+error.plot(error_matrix, "Maximum sample size")
 ```
 
 ---
-## 8. Personalize filtering parameters for random forest
-Error performance for lowest price acceptable for property
-
-```{r}
+## 8. Personalize filtering parameters for random forest 
+```{r, eval=FALSE}
 error_matrix<-NULL
-for (i in seq(100,10000,200)){
+for (i in seq(100,5000,400)){
 output<-modeling(home_county_cleaned_dta,
                  method="tree",
                       price_h=5000000,
@@ -1445,18 +1495,15 @@ colnames(error_matrix)<-c("Parameter","Retention","MSE","MPE","MAPE")
 error_matrix<-error_matrix%>%as.data.frame()
 save(error_matrix,file = "dta_processed/price_l.RData")
 ```
----
-## 8. Personalize filtering parameters for random forest
-This one looks at lowest price acceptable for property. We can see there's a tradeoff between having better prediction and having less data.
+ 
 ```{r}
 load("dta_processed/price_l.RData")
-error.plot(error_matrix)
+error.plot(error_matrix, "Lowest price of property to be included")
 ```
 
 ---
-## 8. Personalize filtering parameters for random forest
-Error performance for starting year to filter the properties
-```{r}
+## 8. Personalize filtering parameters for random forest 
+```{r, eval=FALSE}
 error_matrix<-NULL
 for (i in c(2000:2017)){
 output<-modeling(home_county_cleaned_dta,
@@ -1477,20 +1524,17 @@ colnames(error_matrix)<-c("Parameter","Retention","MSE","MPE","MAPE")
 error_matrix<-error_matrix%>%as.data.frame()
 save(error_matrix,file = "dta_processed/yr_st.RData")
 ```
----
-## 8. Personalize filtering parameters for random forest
-This one looks at starting year to filter the properties. It seems constraining to certain recent year may help, but we want to further figure out what's its impact on the sample size.
+ 
 ```{r}
 load("dta_processed/yr_st.RData")
-error.plot(error_matrix)
+error.plot(error_matrix, "Oldest property record to be included")
 ```
 
 ---
-## 8. Personalize filtering parameters for random forest
-Error performance for highest price acceptable for properties. 
-```{r}
+## 8. Personalize filtering parameters for random forest 
+```{r, eval=FALSE}
 error_matrix<-NULL
-for (i in seq(100000,10000000,200000)){
+for (i in seq(100000,10000000,400000)){
 output<-modeling(home_county_cleaned_dta,
                  method="tree",
                       price_h=i,
@@ -1509,34 +1553,45 @@ colnames(error_matrix)<-c("Parameter","Retention","MSE","MPE","MAPE")
 error_matrix<-error_matrix%>%as.data.frame()
 save(error_matrix,file = "dta_processed/price_h.RData")
 ```
-
----
-## 8. Personalize filtering parameters for random forest
-This one looks at highest price acceptable for properties It seems 
+ 
 ```{r}
 load("dta_processed/price_h.RData")
-error.plot(error_matrix)
+error.plot(error_matrix, "Highest price of property to be included")
 ```
 
 ---
 ## 9. Iteration through cities/counties and view corss-validated model performance
-Cities
+ - Cities
+```{r,eval=FALSE}
+rf_set_city<-modeling(home_city_cleaned_dta,
+                      method = "regularization")
+save(rf_set_city,file = "dta_processed/regularization_rf_set_city.RData")
+```
+
 ```{r}
-rf_set_city<-modeling(home_city_cleaned_dta)%>%select(price_high:rf_5th)
-rf_set_city[order(rf_set_city$rf_MAPE),]%>%data.table()
+load("dta_processed/regularization_rf_set_city.RData")
+rf_set_city[order(rf_set_city$LASSO_MAPE),]%>%select(-LASSO_names)%>%DT::datatable(width=500,
+                                                                                   height = 200)
 ```
+
 
 ---
 ## 9. Iteration through cities/counties and view corss-validated model performance
-Counties
-```{r, echo=TRUE, warning=FALSE}
-rf_set_county<-modeling(home_county_cleaned_dta)%>%select(price_high:rf_5th)
-rf_set_county[order(rf_set_county$rf_MAPE),]%>%data.table()
+ - Counties
+```{r, eval=FALSE}
+rf_set_county<-modeling(home_county_cleaned_dta,
+                       method = "regularization")
+save(rf_set_county,file = "dta_processed/regularization_rf_set_county.RData")
+```
+
+```{r}
+load("dta_processed/regularization_rf_set_county.RData")
+rf_set_county[order(rf_set_county$LASSO_MAPE),]%>%select(-LASSO_names)%>%DT::datatable()
 ```
 
 ---
 ## 10. Map county-level model performance
-We want to see how each county performs on the map.
+We can to see how each county performs on the map.
 ```{r}
 #merge model performance data by county to parcel file
 rf_set_county1 <- rf_set_county
@@ -1544,51 +1599,44 @@ rf_set_county1$subsample <-
   rf_set_county1$subsample %>% str_sub(start = 4L)
 names(rf_set_county1)[5] <- "NAME"
 parcel@data <- inner_join(parcel@data, rf_set_county1, by = "NAME")
-```
----
-## 10. Map county-level model performance
-Different measure and attributed displayed in the map
+``` 
+
 ```{r}
 tmap_arrange(
   summary.county(varname = "preprocess_retention"),
   summary.county(varname = "obs"),
   summary.county(varname = "vars"),
-  summary.county(varname = "rf_MSE"),
-  summary.county(varname = "rf_MPE"),
-  summary.county(varname = "rf_MAPE"),
-  summary.county(varname = "rf_1st"),
-  summary.county(varname = "rf_2nd"),
-  summary.county(varname = "rf_3rd"),
+  summary.county(varname = "LASSO_MSE"),
+  summary.county(varname = "LASSO_MPE"),
+  summary.county(varname = "LASSO_MAPE"),
   ncol = 3
 )
 ```
 
 ---
+exclude: true
 ## 10. Map county-level model performance
 If we recall previous exploratory analysis, the county's performance relies quite some on the features of each individual county. For some counties which lack a considerable number of important attributes, the prediction power is small. This sugggests it's correct to model by county to avoid the data quality issue of some counties will spread to the whole sample, but how to improve the low data quality prediction can be a subsequent challenge.
 
 ---
 ## 11. Brief Summary
 
-Random forest algorithm consistently outperform gradient boosting
+ - Random forest algorithm consistently outperformed by gradient boosting
 
-City-level models have varying performance and higher potential
+ - City-level models have varying performance and have potential for better model selection
 
-Ability to predict within 10% deviation in some cities
+ - Ability to predict within 10% deviation in some cities
 
-Key filtering parameters optimized to improve prediction with reasonable constraint on sample size
+ - Key filtering parameters optimized to improve prediction with reasonable constraint on sample size
 
-Transaction time and building area is 2 primary factor to determine property value
-
-Many subsample's performance yet to be improved
-
----
+ - Transaction time and building area is 2 primary factor to determine property value
+ 
 ## 12. Next step
-add tract block medium price as control
 
-Can try tuning the filtering parameter for each model
+ - Add census tract block medium price as control
 
-xgboost
-log scale price
-recode zip code to dummy (one-hot recoding)
-cities can use superzip as example
+ - Can try tuning the filtering parameter for each model
+
+ - log scale price
+
+ - recode zip code to dummy (one-hot recoding)
