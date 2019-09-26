@@ -47,6 +47,8 @@ knitr::opts_chunk$set(
   message = FALSE,
   warning = FALSE,
   figure.align = "center",
+  out.width = "900px",
+  out.height="500px",
   cache = TRUE,
   cache.lazy = FALSE
 )
@@ -1570,8 +1572,7 @@ save(rf_set_city,file = "dta_processed/regularization_rf_set_city.RData")
 
 ```{r}
 load("dta_processed/regularization_rf_set_city.RData")
-rf_set_city[order(rf_set_city$LASSO_MAPE),]%>%select(-LASSO_names)%>%DT::datatable(width=500,
-                                                                                   height = 200)
+rf_set_city[order(rf_set_city$LASSO_MAPE),]%>%select(-LASSO_names)%>%DT::datatable()
 ```
 
 
