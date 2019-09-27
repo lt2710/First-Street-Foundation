@@ -28,7 +28,8 @@ packages <- c("tidyr",
               "gridExtra",
               "rgdal",
               "tmap",
-              "leaflet"
+              "leaflet",
+              "DT"
               )
 packages <- lapply(packages, FUN = function(x) {
   if(!require(x, character.only = TRUE)) {
@@ -39,53 +40,32 @@ packages <- lapply(packages, FUN = function(x) {
 )
 ```
 
-```{r setup}
-library("knitr")
-knitr::opts_chunk$set(
-  echo = FALSE,
-  eval = TRUE,
-  message = FALSE,
-  warning = FALSE,
-  fig.height = 10,
-  fig.width = 18,
-  figure.align = "center",
-  cache = TRUE,
-  cache.lazy = FALSE
-)
-#knitr::opts_knit$set(root.dir = "C:\\Users\\Tianl\\Documents\\GitHub\\First-Street-Foundation")
-options(htmltools.dir.version = FALSE)
-```  
-
-```{r theme-map, include=FALSE}
-theme_simplemap <- function(base_size = 9,
-                            base_family = "") {
-  theme_bw(base_size = base_size, base_family = base_family) %+replace%
-    theme(
-      axis.line = element_blank(),
-      axis.text = element_blank(),
-      axis.ticks = element_blank(),
-      axis.title = element_blank(),
-      panel.background = element_blank(),
-      panel.border = element_blank(),
-      panel.grid = element_blank(),
-      panel.spacing = unit(0, "lines"),
-      plot.background = element_blank(),
-      legend.position = "none"
-    )
-}
-``` 
 ---
 ## 9. Iteration through cities/counties and view corss-validated model performance
  - Counties
-```{r, eval=FALSE}
-rf_set_county<-modeling(home_county_cleaned_dta,
-                       method = "regularization")
-save(rf_set_county,file = "dta_processed/regularization_rf_set_county.RData")
-```
 
-```{r}
-load("dta_processed/regularization_rf_set_city.RData")
-rf_set_city[order(rf_set_city$LASSO_MAPE),]%>%select(-LASSO_names)%>%DT::datatable(width=100,height = 100)
+```{r, echo=FALSE}
+cbind(seq(10,1000,10),
+      seq(10,1000,10),
+      seq(10,1000,10),
+      seq(10,1000,10),
+      seq(10,1000,10),
+      seq(10,1000,10),
+      seq(10,1000,10),
+      seq(10,1000,10),
+      seq(10,1000,10),
+      seq(10,1000,10),
+      seq(10,1000,10),
+      seq(10,1000,10),
+      seq(10,1000,10),
+      seq(10,1000,10),
+      seq(10,1000,10),
+      seq(10,1000,10),
+      seq(10,1000,10),
+      seq(10,1000,10),
+      seq(10,1000,10),
+      seq(10,1000,10),
+      seq(10,1000,10))%>%datatable()
 ```
 
 ---
