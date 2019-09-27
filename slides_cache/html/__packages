@@ -16,4 +16,5 @@ sp
 rgdal
 tmap
 leaflet
+DT
 sf

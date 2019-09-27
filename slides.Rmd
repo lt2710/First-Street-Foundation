@@ -28,7 +28,8 @@ packages <- c("tidyr",
               "gridExtra",
               "rgdal",
               "tmap",
-              "leaflet"
+              "leaflet",
+              "DT"
               )
 packages <- lapply(packages, FUN = function(x) {
   if(!require(x, character.only = TRUE)) {
@@ -1361,8 +1362,14 @@ ggplot(dta)+
 
 ---
 ## 7 Visualize model performance
-```{r}
-major_models%>%select(-LASSO_names)%>%DT::datatable()
+```{r,fig.width=15}
+major_models%>%select(subsample,
+                      averageprice,
+                      floodrisk,
+                      rf_MAPE,
+                      gb_MAPE,
+                      ridge_MAPE,
+                      LASSO_MAPE)%>%DT::datatable()
 ```
 
 ---
@@ -1570,9 +1577,13 @@ rf_set_city<-modeling(home_city_cleaned_dta,
 save(rf_set_city,file = "dta_processed/regularization_rf_set_city.RData")
 ```
 
-```{r}
+```{r,fig.width=15}
 load("dta_processed/regularization_rf_set_city.RData")
-rf_set_city[order(rf_set_city$LASSO_MAPE),]%>%select(-LASSO_names)%>%DT::datatable()
+rf_set_city[order(rf_set_city$LASSO_MAPE), ] %>% select(subsample,
+                                                        ridge_MPE,
+                                                        ridge_MAPE,
+                                                        LASSO_MPE,
+                                                        LASSO_MAPE) %>% DT::datatable()
 ```
 
 
@@ -1585,9 +1596,13 @@ rf_set_county<-modeling(home_county_cleaned_dta,
 save(rf_set_county,file = "dta_processed/regularization_rf_set_county.RData")
 ```
 
-```{r}
+```{r,fig.width=20}
 load("dta_processed/regularization_rf_set_county.RData")
-rf_set_county[order(rf_set_county$LASSO_MAPE),]%>%select(-LASSO_names)%>%DT::datatable()
+rf_set_county[order(rf_set_county$LASSO_MAPE),] %>% select(subsample,
+                                                           ridge_MPE,
+                                                           ridge_MAPE,
+                                                           LASSO_MPE,
+                                                           LASSO_MAPE) %>% DT::datatable()
 ```
 
 ---
