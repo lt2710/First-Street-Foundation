@@ -46,9 +46,9 @@ knitr::opts_chunk$set(
   eval = TRUE,
   message = FALSE,
   warning = FALSE,
+  fig.width = 15,
+  fig.height = 7,
   figure.align = "center",
-  out.width = "900px",
-  out.height="500px",
   cache = TRUE,
   cache.lazy = FALSE
 )

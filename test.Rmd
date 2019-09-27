@@ -46,6 +46,8 @@ knitr::opts_chunk$set(
   eval = TRUE,
   message = FALSE,
   warning = FALSE,
+  fig.height = 10,
+  fig.width = 18,
   figure.align = "center",
   cache = TRUE,
   cache.lazy = FALSE
@@ -81,15 +83,15 @@ rf_set_county<-modeling(home_county_cleaned_dta,
 save(rf_set_county,file = "dta_processed/regularization_rf_set_county.RData")
 ```
 
-```{r, out.width = '200px'}
+```{r}
 load("dta_processed/regularization_rf_set_city.RData")
-rf_set_city[order(rf_set_city$LASSO_MAPE),]%>%select(-LASSO_names)%>%DT::datatable()
+rf_set_city[order(rf_set_city$LASSO_MAPE),]%>%select(-LASSO_names)%>%DT::datatable(width=100,height = 100)
 ```
 
 ---
 ##Try this
  - try his
-```{r, out.width = '900px',out.height="500px"}
+```{r}
 dta<-cbind(y=seq(10,1000,10),
            x=seq(5,995,10))%>%as.data.frame()
 ggplot(dta,
