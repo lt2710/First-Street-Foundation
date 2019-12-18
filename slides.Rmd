@@ -219,19 +219,49 @@ home_dta_ver1 %>% report.dim()
 # - Recoding and transforming features
 #This chunk of recoding is not supposed to change data dimension
 #Fill in the price variable so that it will not be dropped later
-home_dta$deedlastsaleprice[is.na(home_dta$deedlastsaleprice) == "TRUE"] <- 0
+home_dta<-home_dta%>%filter(is.na(home_dta$deedlastsaleprice) == "FALSE")
 #Rounding deed last sale date to year and recoding NAs
-home_dta$deedlastsaledate <-
-  str_sub(home_dta$deedlastsaledate, start = 0, end = 4) %>%
-  as.numeric()
-home_dta$deedlastsaledate[home_dta$deedlastsaledate == ""] <- NA
-#Make id numeric
-home_dta$attomid <- home_dta$attomid %>% as.numeric()
+home_dta <- home_dta %>% mutate(attomid=attomid %>% as.numeric(),
+                                year_lastsale =
+                                  str_sub(deedlastsaledate, start = 0, end = 4),
+                                month_lastsale =
+                                  str_sub(deedlastsaledate, start = 6, end = 7),
+                                day_lastsale =
+                                  deedlastsaledate%>%as.Date()%>%weekdays())
 #Recoding ownership type misseallenous to NA
 home_dta$ownertypedescription1[home_dta$ownertypedescription1 %in% c ("NP", "UNKNOWN", "") |
                                  is.na(home_dta$ownertypedescription1) == TRUE] <- 0
 home_dta$ownertypedescription2[home_dta$ownertypedescription2 %in% c ("NP", "UNKNOWN", "") |
                                  is.na(home_dta$ownertypedescription2) == TRUE] <- 0
+```
+
+```{r}
+home_dta[1:5000] %>% select(deedlastsaleprice,
+  #Transaction price last sale
+  situsstatecode,
+  #State code
+  situscounty,
+  #County code
+  propertyaddresscity,
+  #City code
+  ownertypedescription1,
+  #First owner is individual/company?
+  ownertypedescription2,
+  #Second owner is individual/company?
+  deedlastsaledate,
+  #Date of market sale
+  yearbuilt,
+  #Year when built
+  propertyusegroup,
+  #Commercial/residential?
+  areabuilding,
+  #Living area in sq.feet
+  censustract,
+  #Census tract division
+  propertylatitude,
+  #Lat of property
+  propertylongitude
+) %>% missing_plot()
 ```
 
 ```{r}
@@ -341,7 +371,8 @@ summary.variable <- function(varname = "deedlastsaleprice",
       xlab(paste(varname, class(dta[[varname]]))) +
       ylab("Properties") +
       theme_classic() +
-      theme(axis.text.x = element_text(angle = 30, hjust = 1))
+      theme(axis.text.x = element_text(angle = 30, hjust = 1))+
+  theme(text = element_text(size = 20))
   }
   #For factors and logicals
   if (class(dta[[varname]]) %in% c("factor", "logical")) {
@@ -351,7 +382,8 @@ summary.variable <- function(varname = "deedlastsaleprice",
       xlab(paste(varname, class(dta[[varname]]))) +
       ylab("Properties") +
       theme_classic() +
-      theme(axis.text.x = element_text(angle = 30, hjust = 1))
+      theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+      theme(text = element_text(size = 20))
   }
   return(m)
 }
@@ -489,7 +521,8 @@ ggplot(by_year_county[by_year_county$deedlastsaledate > 1955 &
   ggtitle("Historical transaction price in each county") +
   labs(caption = "Source: ATTOM Data Solutions") +
   theme_classic() +
-  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))+
+  theme(text = element_text(size = 20))
 ```
 
 ---
@@ -527,7 +560,8 @@ ggplot(by_year_use%>%filter(deedlastsaledate %in%c(1955:2019)),
   ggtitle("Historical price between commercial and residential properties") +
   labs(caption = "Source: ATTOM Data Solutions") +
   theme_classic() +
-  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))+
+  theme(text = element_text(size = 20))
 ```
 
 ---
@@ -564,7 +598,8 @@ ggplot(by_year_own%>%filter(deedlastsaledate %in%c(1955:2019)),
   ggtitle("Historical price between company-ownerd and individual-owned properties")+
   labs(caption = "Source: ATTOM Data Solutions")+
   theme_classic()+
-  theme(axis.text.x=element_text(angle=30, hjust=1))
+  theme(axis.text.x=element_text(angle=30, hjust=1))+
+  theme(text = element_text(size = 20))
 ```
 
 ---
@@ -616,7 +651,8 @@ ggplot(
   ggtitle("Average transaction price for risky assets and non-risky assets") +
   labs(caption = "Source: ATTOM Data Solutions") +
   theme_classic() +
-  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))+
+  theme(text = element_text(size = 20))
 ```
 
 ---
@@ -636,7 +672,8 @@ ggplot(by_year_floodrisk %>% filter(deedlastsaledate %in% c(2000:2019)),
   ggtitle("Average transaction frequency for risky assets and non-risky assets") +
   labs(caption = "Source: ATTOM Data Solutions") +
   theme_classic() +
-  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))+
+  theme(text = element_text(size = 20))
 ```
 
 ---
@@ -710,7 +747,8 @@ ggplot(by_city,
   ggtitle("Average property price and transaction frequency in cities with different flooding risk",
           subtitle = "Large cities annotated")+
   labs(caption = "Source: ATTOM Data Solutions")+
-  theme_classic()
+  theme_classic()+
+  theme(text = element_text(size = 20))
 ```
 
 ---
@@ -737,7 +775,8 @@ ggplot(by_city,
           subtitle = "Large cities annotated")+
   labs(caption = "Source: ATTOM Data Solutions")+
   theme_classic()+
-  theme(axis.text.x=element_text(angle=30, hjust=1))
+  theme(axis.text.x=element_text(angle=30, hjust=1))+
+  theme(text = element_text(size = 20))
 ```
 
 
@@ -1312,7 +1351,8 @@ ggplot(dta)+
   labs(caption = "Source: ATTOM Data Solutions",
        fill = "Model") +
   theme_classic() +
-  theme(axis.text.x=element_blank(),
+  theme(axis.text.x=element_blank()+
+  theme(text = element_text(size = 20)),
         legend.position = "none")
 ```
 
@@ -1334,7 +1374,8 @@ ggplot(dta)+
   labs(caption = "Source: ATTOM Data Solutions",
        fill = "Model") +
   theme_classic() +
-  theme(axis.text.x=element_blank(),
+  theme(axis.text.x=element_blank()+
+  theme(text = element_text(size = 20)),
         legend.position = "none")
 ```
 
@@ -1356,7 +1397,8 @@ ggplot(dta)+
   labs(caption = "Source: ATTOM Data Solutions",
        fill = "Model") +
   theme_classic() +
-  theme(axis.text.x=element_blank(),
+  theme(axis.text.x=element_blank()+
+  theme(text = element_text(size = 20)),
         legend.position = "none")
 ```
 
@@ -1404,7 +1446,8 @@ ggplot(major_models,
           subtitle = "Cities with high flood risk and high prediction accuracy (within 30%) annotated") +
   labs(caption = "Source: ATTOM Data Solutions") +
   theme_classic() +
-  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))+
+  theme(text = element_text(size = 20))
 ```
 
 
@@ -1424,7 +1467,8 @@ error.plot <- function(dta = error_matrix,
     xlab(title) +
     ylab("% of obs kept") + 
     theme(legend.position = "left") +
-    theme_classic()
+    theme_classic()+
+  theme(text = element_text(size = 20))
   mse <- ggplot(data = dta) +
     geom_line(aes(x = Parameter,
                   y = MSE),
@@ -1432,7 +1476,8 @@ error.plot <- function(dta = error_matrix,
     xlab(title) +
     ylab("MSE") + 
     theme(legend.position = "left") +
-    theme_classic()
+    theme_classic()+
+  theme(text = element_text(size = 20))
   mpe <- ggplot(data = dta) +
     geom_line(aes(x = Parameter*100,
                   y = MPE),
@@ -1440,7 +1485,8 @@ error.plot <- function(dta = error_matrix,
     xlab(title) +
     ylab("MPE %") + 
     theme(legend.position = "left") +
-    theme_classic()
+    theme_classic()+
+  theme(text = element_text(size = 20))
   mape <- ggplot(data = dta) +
     geom_line(aes(x = Parameter*100,
                   y = MAPE),
@@ -1448,7 +1494,8 @@ error.plot <- function(dta = error_matrix,
     xlab(title) +
     ylab("MAPE %") + 
     theme(legend.position = "left") +
-    theme_classic()
+    theme_classic()+
+  theme(text = element_text(size = 20))
   grid.arrange(retention, mse, mape, mpe)
 }
 ```

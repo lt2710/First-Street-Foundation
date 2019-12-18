@@ -1,0 +1,374 @@
+---
+title: "Data preparation"
+author: "Langyi Tian"
+output: html_document
+---
+```{r setup}
+library("knitr")
+knitr::opts_chunk$set(
+  echo = TRUE,
+  eval = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 15,
+  fig.height = 7,
+  figure.align = "center",
+  cache = TRUE,
+  cache.lazy = FALSE
+)
+#knitr::opts_knit$set(root.dir = "C:\\Users\\Tianl\\Documents\\GitHub\\First-Street-Foundation")
+options(htmltools.dir.version = FALSE)
+```  
+
+```{r packages, include=FALSE}
+# Load packages.
+packages <- c("tidyverse", 
+              "data.table",
+              "parallel",
+              "qwraps2",
+              "mice",
+              "finalfit",
+              "missMDA",
+              "FactoMineR",
+              "factoextra",
+              "knitr",
+              "ggplot2"
+              )
+packages <- lapply(packages, FUN = function(x) {
+  if(!require(x, character.only = TRUE)) {
+    install.packages(x)
+  library(x, character.only = TRUE)
+  }
+}
+)
+```
+ 
+## Prepare and merge raw data in 3 datasets
+ 
+```{r import raw main data: real estate property records, eval=FALSE}
+#Input original dataset 1: property data
+home_dta_original<-fread("raw_data/SF_Home_Characteristics.csv")
+save(home_dta_original, file = "dta_processed/SF_Taxassessor_original.RData")
+```
+
+```{r select features in main dataset and save, eval=FALSE} 
+home_dta <- select(
+  home_dta_original,
+  attomid,#Matching ID
+  deedlastsaleprice,#Transaction price last sale
+  situsstatecode,#State code
+  situscounty,#County code
+  propertyaddresscity,#City code
+  ownertypedescription1,#First owner is individual/company?
+  ownertypedescription2,#Second owner is individual/company?
+  taxyearassessed,#Year of last tax assessment
+  taxassessedvaluetotal,#Assessed market value
+  deedlastsaledate,#Date of market sale
+  yearbuilt,#Year when built
+  propertyusegroup,#Commercial/residential?
+  areabuilding,#Living area in sq.feet
+  censustract,#Census tract division
+  roomsatticflag,#See below
+  parkinggarage:communityrecroomflag#A series variable measuring physical attributes of the property, including rooms count and relevant facilities
+)
+save(home_dta, file = "dta_processed/SF_Taxassessor_reduced.RData")
+```
+ 
+```{r import dataset 2: property and environmental risk, eval=FALSE}
+#Import dataset 2: property and environmental risk, subset and save
+risk_dta_original <-
+  fread("raw_data/SF_Parcel_Risk_and_Spatial_Data.csv")
+save(risk_dta_original, file = "dta_processed/SF_Parcel_Risk_and_Spatial_Data_original.RData")
+```
+
+```{r restructure dataset 2, eval=FALSE}
+risk_dta <-
+  risk_dta_original %>% select(attomid = ATTOM_ID, #ID
+                               dist_coast, #Distance to coast
+                               mdkt32, #Flooding probability estimate in next years
+                               Totpopbg:near_reading_rates, )#a set of demographic information varying by census tract
+save(risk_dta, file = "dta_processed/SF_Parcel_Risk_and_Spatial_Data_reduced.RData")
+#this data has huge missing data issue. need to impute
+```
+ 
+```{r dataset 3: property transactions, eval=FALSE}
+#Import dataset 3: property transactions, subset and save
+trans_dta_original <-
+  fread("raw_data/SF_Sales_Transactions_Data.csv")
+save(trans_dta_original, file = "dta_processed/SF_Sales_Transactions_Data_original.RData")
+```
+
+```{r restructure and save dataset 3, eval=FALSE}
+trans_dta_small <- trans_dta_original %>% select(attomid,
+                                           transferamount,
+                                           recordingdate) %>% filter(attomid!="999999999",
+                                                                     transferamount > 0,
+                                                                     recordingdate != "")
+records <- trans_dta_small %>% group_by(attomid)%>%slice(2)
+times <- trans_dta_small %>% group_by(attomid) %>% summarize(trans_times = n()) %>%filter(trans_times>1)
+trans_dta <- full_join(records,times,by="attomid")
+save(trans_dta, file = "dta_processed/SF_Sales_Transactions_Data_reduced.RData")
+```
+
+```{r merge 3 data sets}
+#Load and join saved RData
+load("dta_processed/SF_Taxassessor_reduced.RData")
+load("dta_processed/SF_Sales_Transactions_Data_reduced.RData")
+home_dta <- left_join(home_dta, trans_dta, by = "attomid")
+load("dta_processed/SF_Parcel_Risk_and_Spatial_Data_reduced.RData")
+```
+
+```{r}
+#Store (and report) a current version of data here
+report.dim <- function(dta) {
+  cat("Up to here, the data dimension is",
+      dim(dta)[1],
+      "*",
+      dim(dta)[2])
+}
+home_dta %>% report.dim()
+```
+
+## Initial cleaning and filtering
+```{r initial filtering and variable enginerring}
+# - Recoding and transforming features
+#This chunk of recoding is not supposed to change data dimension
+#Fill in the price variable so that it will not be dropped later
+home_dta <- home_dta %>% filter(areabuilding > 50,
+                                deedlastsaleprice>5000,
+                                deedlastsaleprice<100000000,
+                                is.na(home_dta$deedlastsaleprice) == "FALSE")
+home_dta[home_dta == ""] <- NA
+#Rounding deed last sale date to year and recoding NAs
+home_dta <- home_dta %>% mutate(
+  attomid = attomid %>% as.numeric(),
+  year_sale =
+    str_sub(deedlastsaledate, start = 0, end = 4) %>%
+    as.numeric(),
+  month_sale =
+    str_sub(deedlastsaledate, start = 6, end = 7),
+  day_sale =
+    deedlastsaledate %>% as.Date() %>% weekdays(),
+  year_lastsale =
+    str_sub(recordingdate, start = 0, end = 4) %>%
+    as.numeric(),
+  month_lastsale =
+    str_sub(recordingdate, start = 6, end = 7),
+  day_lastsale =
+    recordingdate %>% as.Date() %>% weekdays()
+) %>% select(
+  -attomid,-deedlastsaledate, -recordingdate
+)
+```
+ 
+```{r drop all unary features}
+#Drop unary variables in dataset
+drop.unary <- function(dta) {
+  for (i in names(dta)) {
+    var <- dta[[i]]
+    var <- var[is.na(var) == FALSE]
+    if ((var %>% unique() %>% length() %in% c(0, 1))) {
+      dta <- dta %>% select(-i)
+    }
+  }
+  return(dta)
+}
+home_dta <- home_dta %>% drop.unary()
+home_dta_ver1.5 <- home_dta
+home_dta_ver1.5 %>% report.dim()
+```
+
+## Missing value detection and imputation
+```{r dataset overview}
+home_dta%>%str()
+```
+
+```{r Ensure all factors and numerics are correctly assigned}
+for (i in c(
+  "censustract",
+  "parkinggarage",
+  "hvaccoolingdetail",
+  "hvacheatingdetail",
+  "hvacheatingfuel",
+  "month_lastsale",
+  "day_lastsale",
+  "foundation",
+  "construction",
+  "flooringmaterialprimary",
+  "fireplace",
+  "roofmaterial",
+  "roofconstruction",
+  "viewdescription",
+  "deckflag",
+  "pool",
+  "arenaflag",
+  "year_sale",
+  "month_sale",
+  "day_sale",
+  "year_lastsale",
+  "month_lastsale",
+  "day_lastsale")) {
+  home_dta[[i]] <- home_dta[[i]]%>%as.character()
+}
+```
+
+```{r check variable categories, eval=FALSE}
+options(qwraps2_markup = "markdown")
+home_dta %>% summary_table()
+```
+
+```{r ensure missing values are correctly assigned NA}
+home_dta$ownertypedescription1[home_dta$ownertypedescription1 %in% c ("NP", "UNKNOWN")] <- NA
+home_dta$ownertypedescription2[home_dta$ownertypedescription2 %in% c ("NP", "UNKNOWN")] <- NA
+home_dta$propertyusegroup[home_dta$propertyusegroup%in% c ("NP", "UNKNOWN")] <- NA
+home_dta$parkinggarage[home_dta$parkinggarage=="1"] <- NA
+home_dta$hvacheatingfuel[home_dta$hvacheatingfuel=="380"] <- NA
+home_dta$foundation[home_dta$foundation=="999"] <- NA
+home_dta$construction[home_dta$construction=="999"] <- NA
+home_dta$roofmaterial[home_dta$roofmaterial=="101"] <- NA
+home_dta$roofmaterial[home_dta$roofmaterial=="0"] <- NA
+```
+
+```{r have a glimpce at missing pattern}
+dependent <- "deedlastsaleprice"
+explanatory <- names(home_dta)%>%setdiff(c("deedlastsaleprice"))
+home_dta%>%ff_glimpse(dependent, explanatory)
+```
+
+```{r manual recoding with field knowledge}
+home_dta$ownertypedescription2[is.na(home_dta$ownertypedescription2)==TRUE]<-"No secondary owner"
+home_dta$censustract[is.na(home_dta$censustract)==TRUE]<-"Not available"
+home_dta$parkinggarage[is.na(home_dta$parkinggarage)==TRUE]<-"Not available"
+home_dta$hvaccoolingdetail[is.na(home_dta$hvaccoolingdetail)==TRUE]<-"Not available"
+home_dta$hvacheatingfuel[is.na(home_dta$hvacheatingfuel)==TRUE]<-"Not available"
+home_dta$flooringmaterialprimary[is.na(home_dta$flooringmaterialprimary)==TRUE]<-"Not available"
+home_dta$fireplace[is.na(home_dta$fireplace)==TRUE]<-0
+home_dta$transferamount[is.na(home_dta$transferamount)==TRUE]<-9999999999999#indicator value for missing
+home_dta$trans_times[is.na(home_dta$trans_times)==TRUE]<-1
+#encode missing time indicators to categorical to allow flexibility and non-linearity
+for (i in c(
+  "year_sale",
+  "month_sale",
+  "day_sale",
+  "year_lastsale",
+  "month_lastsale",
+  "day_lastsale")) {
+  home_dta[[i]][is.na(home_dta[[i]])==TRUE]<-"Not available"
+}
+#drop too messy variables
+home_dta<-home_dta%>%select(-construction,
+                            -roofmaterial,
+                            -foundation,
+                            -exterior1code,
+                            -roofconstruction,
+                            -arenaflag
+                            )
+```
+
+```{r plot missing value distribution, eval=FALSE}
+explanatory <- names(home_dta)%>%setdiff(c("deedlastsaleprice"))
+home_dta %>% missing_plot(dependent,
+                          explanatory,
+                          title = "Missing values map: original data")
+```
+
+```{r observe missingness pattern 1, eval=FALSE}
+pattern <-
+  home_dta %>% missing_pattern(
+    dependent,
+    c(
+      "ownertypedescription1",
+      "propertyusegroup",
+      "fireplacecount"
+    )
+  )
+```
+
+```{r observe missingness pattern 2, eval=FALSE}
+home_dta %>% missing_pairs(
+  dependent,
+  c(
+    "ownertypedescription1",
+    "propertyusegroup",
+    "fireplacecount"
+  )
+)
+```
+
+## FAMD on home properties
+```{r recode character into factor} 
+for (i in names(home_dta)){
+  if (class(home_dta[[i]])=="character"){
+    home_dta[[i]]<-home_dta[[i]]%>%as.factor()
+  }
+}
+home_main<-home_dta%>%select(-parkinggarage:-buildingscount)
+```
+
+```{r MDA imputation for FAMD, eval=FALSE}
+home_properties<-home_dta%>%select(parkinggarage:buildingscount)
+res.impute<-imputeFAMD(home_properties,
+                       ncp=2,
+                       method="Regularized",
+                       coeff.ridge=1,
+                       maxiter=1,
+                       seed=1)
+home_properties_complete<-res.impute$completeObs
+save(home_properties_complete,file="dta_processed/home_properties_complete.RData")
+```
+
+```{r FAMD, eval=FALSE}
+load("dta_processed/home_properties_complete.RData")
+res.famd <- FAMD(home_properties_complete, graph = FALSE)
+save(res.famd,file="dta_processed/res.famd.RData")
+```
+
+```{r visualize FAMD, eval=FALSE}
+fviz_screeplot(res.famd)
+```
+
+```{r, eval=FALSE}
+plot(res.famd, choix = "ind")
+```
+
+```{r, eval=FALSE}
+plot(res.famd, choix = "var")
+```
+
+```{r, eval=FALSE}
+plot(res.famd, choix = "quanti")
+```
+
+```{r restore data}
+load("dta_processed/res.famd.RData")
+dta<-cbind(home_main,
+           res.famd$ind$coord)
+```
+
+## Impute other missing values
+```{r simple imputation}
+for (i in names(dta)){
+  if (class(dta[[i]])=="factor"){
+    dta[[i]][is.na(dta[[i]])==TRUE]<-names(sort(-table(dta[[i]])))[1]#Mode replacement with factors
+  } else {
+    dta[[i]][is.na(dta[[i]])==TRUE]<-median(dta[[i]],na.rm = TRUE)#Median replacement with others
+  }
+}
+```
+
+```{r mice imputatoin with random forest, eval=FALSE}
+set.seed(1)
+home_dta_imputed<-parlmice(dta, m = 1, maxit=1,  method="rf")
+dta<-complete(home_dta_imputed)
+```
+
+```{r check result of imputation}
+explanatory <- names(dta)%>%setdiff(c("deedlastsaleprice"))
+ff_glimpse(dta,
+           dependent,
+           explanatory)
+```
+
+```{r output data, eval=FALSE}
+write.csv(dta,"dta_processed/home_dta_completed.csv")
+```

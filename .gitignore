@@ -1,5 +1,6 @@
 *.png
 *.csv
 *.RData
+*.xlsx
 tl_2017_us_county/
 sef_parcels/

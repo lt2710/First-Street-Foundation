@@ -1,0 +1,305 @@
+---
+title: "Machine Learning with H2O"
+author: "Langyi Tian"
+output: html_document
+---
+```{r packages, include=FALSE}
+# Load packages.
+packages <- c("tidyverse", 
+              "data.table",
+              "h2o"
+              )
+packages <- lapply(packages, FUN = function(x) {
+  if(!require(x, character.only = TRUE)) {
+    install.packages(x)
+  library(x, character.only = TRUE)
+  }
+}
+)
+```
+
+```{r setup}
+library("knitr")
+knitr::opts_chunk$set(
+  echo = FALSE,
+  eval = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 15,
+  fig.height = 7,
+  figure.align = "center",
+  cache = TRUE,
+  cache.lazy = FALSE
+)
+#knitr::opts_knit$set(root.dir = "C:\\Users\\Tianl\\Documents\\GitHub\\First-Street-Foundation")
+options(htmltools.dir.version = FALSE)
+```  
+ 
+```{r}
+h2o.init()
+```
+
+```{r import data}
+data <- h2o.importFile("C:/Users/Administrator/Documents/GitHub/First-Street-Foundation/dta_processed/home_dta_completed.csv")
+```
+
+```{r overview data}
+h2o.describe(data)
+```
+
+```{r train validation test split}
+splits <- h2o.splitFrame(data = data, 
+                         ratios = c(0.7, 0.15),  # partition data into 70%, 15%, 15% chunks
+                         destination_frames = c("train", "valid", "test"), # frame ID (not required)
+                         seed = 1)  # setting a seed will guarantee reproducibility
+train <- splits[[1]]
+valid <- splits[[2]]
+test <- splits[[3]]
+```
+ 
+```{r define x and y}
+myY <- "deedlastsaleprice"
+myX <- setdiff(names(data), c(myY,"C1"))  #remove the interest rate column because it's correlated with the outcome
+print(myX)
+```
+
+## GLM
+```{r glm}
+# Run GLM
+glm <- h2o.glm(
+  x = myX,
+  y = myY,
+  training_frame    = train,
+  validation_frame  = test,
+  keep_cross_validation_predictions=TRUE,
+  family            = "poisson",
+  standardize = TRUE
+)
+```
+
+```{r}
+h2o.varimp_plot(glm)
+```
+
+```{r}
+glm_perf <- h2o.performance(model = glm,
+                            newdata = test)
+print(glm_perf)
+```
+
+##GBM
+```{r}
+gbm <- h2o.gbm(
+  x = myX,
+  y = myY,
+  training_frame    = train,
+  validation_frame  = test,
+  keep_cross_validation_predictions=TRUE,
+  ntrees            = 500,
+  max_depth         = 6,
+  learn_rate        = 0.1
+)
+```
+
+```{r}
+h2o.varimp_plot(gbm)
+```
+
+```{r}
+gbm_perf <- h2o.performance(model = gbm,
+                            newdata = test)
+print(gbm_perf)
+```
+
+```{r}
+gbm_params <- list(
+  learn_rate = c(0.01, 0.1),
+  max_depth = c(5, 10, 20),
+  sample_rate = c(0.8, 1.0),
+  col_sample_rate = c(0.2, 0.5, 1.0)
+)
+```
+
+```{r}
+gbm_grid <- h2o.grid(
+  "gbm",
+  x = myX,
+  y = myY,
+  grid_id = "gbm_grid",
+  training_frame = train,
+  validation_frame = valid,
+  keep_cross_validation_predictions=TRUE,
+  ntrees = 100,
+  seed = 1,
+  hyper_params = gbm_params
+)
+```
+
+```{r}
+gbm_gridperf <- h2o.getGrid(grid_id = "gbm_grid",
+                             sort_by = "mae",
+                             decreasing = FALSE)
+print(gbm_gridperf)
+```
+
+```{r}
+best_gbm <- h2o.getModel(gbm_gridperf@model_ids[[1]])
+best_gbm_perf <- h2o.performance(model = best_gbm,
+                                  newdata = test)
+print(best_gbm_perf)
+```
+
+## DRF
+```{r}
+drf <- h2o.randomForest(
+  x = myX,
+  y = myY,
+  training_frame    = train,
+  validation_frame  = test,
+  keep_cross_validation_predictions=TRUE,
+  ntrees            = 100,
+  max_depth         = 10
+)
+```
+
+```{r}
+h2o.varimp_plot(drf)
+```
+
+```{r}
+drf_perf <- h2o.performance(model = drf,
+                            newdata = test)
+print(drf_perf)
+```
+
+```{r}
+drf_params <- list(
+  max_depth = c(5, 10, 20),
+  sample_rate = c(0.8, 1.0)
+)
+```
+
+```{r}
+drf_grid <- h2o.grid(
+  "drf",
+  x = myX,
+  y = myY,
+  grid_id = "drf_grid",
+  training_frame = train,
+  validation_frame = valid,
+  keep_cross_validation_predictions=TRUE,
+  ntrees = 100,
+  seed = 1,
+  hyper_params = drf_params
+)
+```
+
+```{r}
+drf_gridperf <- h2o.getGrid(grid_id = "drf_grid",
+                             sort_by = "mae",
+                             decreasing = FALSE)
+print(drf_gridperf)
+```
+
+```{r}
+best_drf <- h2o.getModel(drf_gridperf@model_ids[[1]])
+best_drf_perf <- h2o.performance(model = best_drf,
+                                  newdata = test)
+print(best_drf_perf)
+```
+
+## MLP
+```{r, eval=FALSE}
+dl <- h2o.deeplearning(
+  x = myX,
+  y = myY,
+  training_frame    = train,
+  validation_frame  = test,
+  keep_cross_validation_predictions=TRUE,
+)
+```
+
+```{r, eval=FALSE}
+h2o.varimp_plot(dl)
+```
+
+```{r, eval=FALSE}
+dl_perf <- h2o.performance(model = dl,
+                            newdata = test)
+print(dl_perf)
+```
+
+```{r, eval=FALSE}
+dl_params <- list(
+  activation = c(
+    "Rectifier",
+    "Maxout",
+    "Tanh",
+    "RectifierWithDropout",
+    "MaxoutWithDropout",
+    "TanhWithDropout"
+  ),
+  hidden = list(c(5, 5, 5, 5, 5), c(10, 10, 10, 10), c(50, 50, 50), c(100, 100, 100)),
+  epochs = c(50, 100, 200)
+  #l1 = c(0, 0.00001, 0.0001),
+  #l2 = c(0, 0.00001, 0.0001),
+  #rate = c(0, 01, 0.005, 0.001),
+  #rate_annealing = c(1e-8, 1e-7, 1e-6),
+  #rho = c(0.9, 0.95, 0.99, 0.999),
+  #epsilon = c(1e-10, 1e-8, 1e-6, 1e-4),
+  #momentum_start = c(0, 0.5),
+  #momentum_stable = c(0.99, 0.5, 0),
+  #input_dropout_ratio = c(0, 0.1, 0.2),
+  #max_w2 = c(10, 100, 1000, 3.4028235e+38)
+)
+```
+
+```{r, eval=FALSE}
+dl_grid <- h2o.grid(
+  "deeplearning",
+  x = myX,
+  y = myY,
+  grid_id = "dl_grid",
+  training_frame = train,
+  validation_frame = valid,
+  keep_cross_validation_predictions=TRUE,
+  seed = 1,
+  hyper_params = dl_params
+)
+```
+
+```{r, eval=FALSE}
+dl_gridperf <- h2o.getGrid(grid_id = "dl_grid",
+                             sort_by = "mae",
+                             decreasing = FALSE)
+print(dl_gridperf)
+```
+
+```{r, eval=FALSE}
+best_dl <- h2o.getModel(dl_gridperf@model_ids[[1]])
+best_dl_perf <- h2o.performance(model = best_dl,
+                                  newdata = test)
+print(best_dl_perf)
+```
+
+##AutoML
+```{r}
+aml <- h2o.automl(x = myX, y = myY,
+                  training_frame = train,
+                  validation_frame = valid,
+                  max_models = 40,
+                  max_runtime_secs = 7200,
+                  seed = 1)
+```
+
+```{r}
+lb <- aml@leaderboard
+print(lb, n = nrow(lb))
+```
+
+```{r}
+best_auto <- aml@leader
+best_auto_perf <- h2o.performance(model = best_auto,
+                                  newdata = test)
+print(best_auto_perf)
+```
